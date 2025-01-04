@@ -8,5 +8,4 @@ const router = express.Router();
 router.post('/register', authenticateFirebaseToken,  registerUser);
 router.get('/',  authenticateFirebaseToken, getAllUsers);
 router.get('/role', authenticateFirebaseToken, getUserRole);
-
 module.exports = router;
