@@ -1,10 +1,16 @@
 const mongoose = require('mongoose');
+const ServiceType = require('./ServiceType');
 
 const appointmentSchema = new mongoose.Schema({
-    clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true }, // Reference to Client
-    trainerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Trainer', required: true }, // Reference to Trainer/User
+    clientId: { type: String, required: true }, 
+    trainerId: { type: String, required: true },
     appointmentDate: { type: Date, required: true },
-    state: { 
+    appointmentTime: {
+      start: { type: String, required: true },
+      end: { type: String, required: true }
+  },
+  serviceType: { type: String, required: true }, 
+    status: { 
       type: String, 
       enum: ['pending', 'in progress', 'complete'], 
       default: 'pending' 
@@ -15,11 +21,11 @@ const appointmentSchema = new mongoose.Schema({
 
     },
     qrCode: { 
-      code: { type: String, required: true }, // The QR code as a string (e.g., URL or base64-encoded image)
+      code: { type: String }, // The QR code as a string (e.g., URL or base64-encoded image)
       isScanned: { type: Boolean, default: false } // Indicates if the QR code has been scanned
     }
   }, { timestamps: true });
-  
+
 const Appointment = mongoose.model('Appointment', appointmentSchema);
 //creating appointment collection if not exist
 Appointment.createCollection().then(function(collection){

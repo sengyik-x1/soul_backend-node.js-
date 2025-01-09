@@ -33,11 +33,6 @@ const getAvailableTimeslots = async (req, res) => {
     }
   };
   
-  module.exports = {
-    getAvailableTimeslots,
-    // other exports...
-  };
-
 // Update timeslot availability for a trainer
 const updateTimeslotAvailability = async (req, res) => {
     const { timeslotId, isAvailable } = req.body;
