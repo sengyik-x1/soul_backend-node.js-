@@ -1,60 +1,66 @@
 const Appointment = require('../model/Appointment');
 const QRCode = require('qrcode');
+const Client = require('../model/Client');
+const Trainer = require('../model/Trainer');
 // Create a new appointment
 const createAppointment = async (req, res) => {
-  const { clientId, trainerId, serviceType, appointmentDate, appointmentTime, status, isConfirmed} = req.body;
-  console.log(req.body);
+  const { clientUid, trainerUid, serviceType, appointmentDate, appointmentTime } = req.body;
+
   try {
-    console.log('checking for required fields');
     // Validate required fields
-    if (!clientId || !trainerId || !serviceType || !appointmentDate || !appointmentTime) {
-      console.log('Missing required fields');
+    if (!clientUid || !trainerUid || !serviceType || !appointmentDate || !appointmentTime?.start || !appointmentTime?.end) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    console.log('validating appointment date');
     // Validate date is in the future
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const bookingDate = new Date(appointmentDate);
-    if (bookingDate < new Date()) {
+    if (bookingDate < today) {
       return res.status(400).json({ error: 'Appointment date must be in the future' });
     }
 
-    console.log('checking for existing appointment');
-    // Check for existing appointments in the same time slot
+    // Fetch client and trainer
+    const client = await Client.findOne({ client_uid: clientUid });
+    const trainer = await Trainer.findOne({ trainer_uid: trainerUid });
+
+    if (!client || !trainer) {
+      return res.status(404).json({ error: 'Client or Trainer not found' });
+    }
+
+    // Check for overlapping appointments
     const existingAppointment = await Appointment.findOne({
-      trainerId,
+      trainerId: trainer._id,
       serviceType,
       appointmentDate,
-      'appointmentTime.start': appointmentTime.start,
-      state: { $nin: ['cancelled'] }
+      $or: [
+        { 'appointmentTime.start': { $lte: appointmentTime.end, $gte: appointmentTime.start } },
+        { 'appointmentTime.end': { $gte: appointmentTime.start, $lte: appointmentTime.end } },
+      ],
+      status: { $nin: ['cancelled'] },
     });
 
     if (existingAppointment) {
-      console.log('Time slot is already booked');
       return res.status(400).json({ error: 'Time slot is already booked' });
     }
 
-    // Create a new appointment
+    // Create and save appointment
     const newAppointment = new Appointment({
-      clientId,
-      trainerId,
+      clientId: client._id,
+      trainerId: trainer._id,
       appointmentDate,
       appointmentTime,
       serviceType,
-      status,
-      isConfirmed,
     });
 
-    console.log('saving appointment');
     const savedAppointment = await newAppointment.save();
-
     res.status(201).json({ message: 'Appointment created successfully', savedAppointment });
-    console.log('Appointment created successfully:', savedAppointment);
   } catch (error) {
     console.error('Error creating appointment:', error.message);
     res.status(500).json({ error: 'Error creating appointment' });
   }
 };
+
 
 const confirmAppointment = async (req, res) => {
   const { appointmentId} = req.params;

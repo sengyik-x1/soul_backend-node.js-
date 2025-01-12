@@ -7,17 +7,33 @@ const MembershipPackage = require('../model/MembershipPackages');
 const getClientDetails = async (req, res) => {
     const { client_uid } = req.params;
     try {
-        const client = await Client.findOne({
-            client_uid
-        });
+        // First find the client
+        let client = await Client.findOne({ client_uid })
+                               .populate('membership.type');
 
         if (!client) {
             return res.status(404).json({ error: 'Client not found' });
         }
-        else {
-            console.log('Client details fetched successfully');
-            res.status(200).json(client);
+
+        // Handle case where client exists but membership or membership.type is null
+        if (client.membership && client.membership.type === null) {
+            // You can either:
+            // 1. Leave it as null (which your frontend should handle)
+            console.log('Client has membership but type is null');
+            
+            // OR
+            // 2. Set some default values
+            client.membership.type = {
+                _id: null,
+                name: 'No Package',
+                price: 0,
+                points: 0,
+                durationMonths: 0
+            };
         }
+
+        console.log('Client details fetched successfully');
+        res.status(200).json(client);
 
 
 } catch (error) {

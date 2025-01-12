@@ -1,6 +1,8 @@
+const http = require('http'); // Required for HTTP server
+const { Server } = require('socket.io'); // Socket.IO
 const express = require('express');
 const dotenv = require('dotenv');
-const app = require('./app');
+const app = require('./app'); // Import Express app
 const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const Appointment = require('./model/Appointment');
@@ -10,87 +12,61 @@ const Client = require('./model/Client');
 const Trainer = require('./model/Trainer');
 const MembershipPackage = require('./model/MembershipPackages');
 
-
 // Load environment variables
 dotenv.config();
 
-//connect to database
+// Connect to the database
 connectDB();
 
-// Create Appointment collection if it does not exist
-Appointment.createCollection().then(function(collection){
-  console.log('Appointment collection created');
-}).catch(err => {
-  console.log('Appointment collection already exists or there was an error:', err);
+// Create collections if they do not exist
+const createCollections = async () => {
+  try {
+    await Promise.all([
+      Appointment.createCollection(),
+      ServiceType.createCollection(),
+      Admin.createCollection(),
+      Client.createCollection(),
+      Trainer.createCollection(),
+      MembershipPackage.createCollection(),
+    ]);
+    console.log('All collections created');
+  } catch (err) {
+    console.error('Error creating collections:', err);
+  }
+};
+createCollections();
+
+// Initialize HTTP server and attach Express app
+const server = http.createServer(app);
+
+// Attach Socket.IO to the server
+const io = new Server(server, {
+  cors: {
+    origin: '*', // Allow all origins (adjust in production)
+    methods: ['GET', 'POST'],
+  },
 });
 
-// Create ServiceType collection if it does not exist
-ServiceType.createCollection().then(function(collection){
-  console.log('ServiceType collection created');
-}).catch(err => {
-  console.log('ServiceType collection already exists or there was an error:', err);
+// Attach `io` to the Express app for use in routes or controllers
+app.set('io', io);
+
+// Handle WebSocket events
+io.on('connection', (socket) => {
+  console.log(`Client connected: ${socket.id}`);
+
+  // Example: Handle messages from the client
+  socket.on('message', (data) => {
+    console.log('Message from client:', data);
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
 });
-
-// Create Admin collection if it does not exist
-Admin.createCollection().then(function(collection){
-  console.log('Admin collection created');
-}).catch(err => {
-  console.log('Admin collection already exists or there was an error:', err);
-});
-
-// Create Client collection if it does not exist
-Client.createCollection().then(function(collection){
-  console.log('Client collection created');
-}).catch(err => {
-  console.log('Client collection already exists or there was an error:', err);
-});
-
-// Create Trainer collection if it does not exist
-Trainer.createCollection().then(function(collection){
-  console.log('Trainer collection created');
-}).catch(err => {
-  console.log('Trainer collection already exists or there was an error:', err);
-});
-
-// Create MembershipPackage collection if it does not exist
-MembershipPackage.createCollection().then(function(collection){
-  console.log('MembershipPackage collection created');
-}).catch(err => {
-  console.log('MembershipPackage collection already exists or there was an error:', err);
-});
-
-
-
-
-const PORT = process.env.PORT || 3000;
-
-// mongoose.connect(process.env.MONGODB_URI)
-// .then(() => { console.log('Connected to MongoDB') })
-// .catch((err) => { console.log(err) });
-
-// Routes
-// app.get('/', (req, res) => {
-//   res.send("Hello world~~~");
-// });
-
-// app.get('/about', (req, res) => {
-//   res.send("About page~~~~");
-// });
-
-// app.post('/api/register', authenticateToken, async (req, res) => {
-//   // Save user logic here...
-//   const { uid, email, role } = req.body;
-
-//   try {
-//     const newUser = new User({ uid, email, role });
-//     await newUser.save();
-//     res.status(201).send('User saved successfully');
-//   } catch (error) {
-//     res.status(400).send('Error saving user');
-//   }
-// });
 
 // Start the server
-app.listen(PORT, () => {
-  console.log(`Server is listening on port http://localhost:${PORT}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
 });

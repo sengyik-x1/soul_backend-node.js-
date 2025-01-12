@@ -3,6 +3,8 @@ const MembershipPackage = require('../model/MembershipPackages');
 const getAllMemberships = async (req, res) => {
     try {
         const memberships = await MembershipPackage.find({});
+        console.log('Memberships fetched successfully');
+        console.log(memberships);
         res.status(200).json(memberships);
     } catch (error) {
         console.error('Error fetching memberships:', error.message);

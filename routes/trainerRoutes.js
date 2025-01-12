@@ -8,7 +8,7 @@ const {
 
 const router = express.Router();
 
-router.post('/', authenticateFirebaseToken, getAllTrainers); // Get all trainers
+router.post('/', getAllTrainers); // Get all trainers
 router.post('/timeslots/:trainerId', authenticateFirebaseToken ,getAvailableTimeslots); // Get available timeslots for a trainer
 router.patch('/timeslots/update', authenticateFirebaseToken ,updateTimeslotAvailability); // Update timeslot availability
 

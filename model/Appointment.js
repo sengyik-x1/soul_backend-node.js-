@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const ServiceType = require('./ServiceType');
 
 const appointmentSchema = new mongoose.Schema({
-    clientId: { type: String, required: true }, 
-    trainerId: { type: String, required: true },
+    clientId: { type: mongoose.SchemaTypes.ObjectId, ref:'Client' , required: true }, 
+    trainerId: { type: mongoose.SchemaTypes.ObjectId, ref: 'Trainer', required: true },
     appointmentDate: { type: Date, required: true },
     appointmentTime: {
       start: { type: String, required: true },
