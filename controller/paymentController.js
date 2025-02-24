@@ -114,6 +114,7 @@ const handleStripeWebhook = async (req, res) => {
             membershipPackageId,
             status: 'success'
           });
+          console.log('Payment completed event emitted');
         } catch (error) {
           console.error('Error processing successful payment:', error);
           // Still send 200 to Stripe but log the error

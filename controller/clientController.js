@@ -1,15 +1,56 @@
 const Client = require('../model/Client');
+const User = require('../model/User');
 //const Payment = require('../model/Payment');
 const MembershipPackage = require('../model/MembershipPackages');
 //const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+const createClient = async (req, res) => {
+    const {uid, email} = req.body;
+    console.log("The req body: " + req.body);
+    if (!uid || !email) {
+        console.log('uid and email are required');
+        return res.status(400).json({ error: 'uid and email are required' });
+      }
+    
 
+    try {
+        // // Create user in Firebase Authentication
+        // const userRecord = await admin.auth().createUser({
+        //     uid,
+        //     password,
+        //     // emailVerified: false, // Email verification required
+        //     // displayName: name,
+        // });
+
+        // // Send email verification link
+        // const verificationLink = await admin.auth().generateEmailVerificationLink(email);
+        // // Here, send the verificationLink via email using Nodemailer or any email service
+
+        // Save user to MongoDB
+        const newUser = new User({
+            uid,
+            email,
+            role: 'client',
+        });
+
+        const savedUser = await newUser.save();
+        console.log(`User record created for email: ${email}`);
+        await Client.create({ client_uid: newUser.uid , email: newUser.email});
+        console.log(`Client record created for user: ${newUser.email}`);
+
+        res.status(201).json({ message: 'Client registered successfully.'});
+    } catch (error) {
+        console.error('Error registering user:', error.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+} 
 const getClientDetails = async (req, res) => {
     const { client_uid } = req.params;
     try {
         // First find the client
         let client = await Client.findOne({ client_uid })
-                               .populate('membership.type');
+                               .populate('membership.type')
+                               .populate('membership.purchaseHistory.packageType');
 
         if (!client) {
             return res.status(404).json({ error: 'Client not found' });
@@ -64,9 +105,9 @@ const updateClientDetails = async (req, res) => {
         client.bmi = bmi;
         client.healthCondition = healthCondition;
         client.goals = goals;
-        if(membership != null){
-            client.membership = membership;
-        }
+        // if(membership != null){
+        //     client.membership = membership;
+        // }
        
 
         await client.save();
@@ -76,7 +117,26 @@ const updateClientDetails = async (req, res) => {
     console.error('Error updating client details:', error.message);
     res.status(500).json({ error: 'Internal server error' });
 }
-
 }
 
-module.exports = { getClientDetails, updateClientDetails };
+// const updateClientMembership = async (req, res) {
+//     const {client_uid, membership} = req.body;
+//     try {
+//         const client = await Client.findOne({client_uid});
+//         if(!client){
+//             return res.status(404).json({error: 'Client not found'});
+//         }
+
+//         if(!membership || !membership.type?.id){
+//             return res.status(400).json({error: 'Invalid membership data'});
+//         }
+
+//         client.membership = 
+//         client.membership = membership;
+//         await client.save();
+//         console.log('Client membership updated successfully');
+//         res.status(200).json(client);
+//     }
+// }
+
+module.exports = {createClient, getClientDetails, updateClientDetails };

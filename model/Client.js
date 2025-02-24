@@ -13,12 +13,12 @@ const purchaseHistorySchema = new mongoose.Schema({
   points: Number,
   amount: Number,
   paymentId: String
-});
+}); 
 
 const membershipSchema = new mongoose.Schema({
   type: { 
     type: mongoose.SchemaTypes.ObjectId, 
-    ref: MembershipPackage,
+    ref: 'MembershipPackage',
     required: true 
   },
   startDate: { 
@@ -34,9 +34,9 @@ const membershipSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
-  active: { 
+  isActive: { 
     type: Boolean, 
-    default: true 
+    default: false
   },
   purchaseHistory: [purchaseHistorySchema]
 });
@@ -124,10 +124,10 @@ clientSchema.methods.activateNewMembership = async function(packageId) {
       
       // Add current membership to purchase history
       this.membership.purchaseHistory.push({
-        packageType: this.membership.type, // This is already an ObjectId
+        packageType: selectedPackage._id, // This is already an ObjectId
         purchaseDate: this.membership.startDate,
-        points: this.membership.points,
-        amount: selectedPackage.price
+        points: selectedPackage.points,
+        amount: selectedPackage.price,
       });
     }
 
@@ -137,7 +137,7 @@ clientSchema.methods.activateNewMembership = async function(packageId) {
       startDate,
       endDate,
       points: selectedPackage.points,
-      active: true,
+      isActive: true,
       purchaseHistory: this.membership ? this.membership.purchaseHistory : []
     };
 
@@ -164,7 +164,7 @@ clientSchema.methods.deductPoints = function(points) {
   
   this.membership.points -= points;
   return this.membership.points;
-};
+}; 
 
 const Client = mongoose.model('Client', clientSchema);
 Client.createCollection().then(function(collection){
