@@ -33,15 +33,32 @@ const createAppointment = async (req, res) => {
       trainerId: trainer._id,
       serviceType,
       appointmentDate,
-      $or: [
-        { 'appointmentTime.start': { $lte: appointmentTime.end, $gte: appointmentTime.start } },
-        { 'appointmentTime.end': { $gte: appointmentTime.start, $lte: appointmentTime.end } },
-      ],
-      status: { $nin: ['cancelled'] },
+      // $or: [
+      //   { 'appointmentTime.start': { $lt: appointmentTime.end, $gte: appointmentTime.start } },
+      //   { 'appointmentTime.end': { $gt: appointmentTime.start, $lte: appointmentTime.end } },
+      // ],
+      clientId: client._id,
+      'appointmentTime.start': appointmentTime.start,
+      'appointmentTime.end': appointmentTime.end,
+      status: { $in: ['pending', 'confirmed'] },
     });
 
     if (existingAppointment) {
-      return res.status(400).json({ error: 'Time slot is already booked' });
+      return res.status(400).json({ error: 'The selected time slot is already booked' });
+    }
+
+     // Check if the trainer already has a confirmed appointment with any client at this time
+     const trainerExistingAppointment = await Appointment.findOne({
+      trainerId: trainer._id,
+      appointmentDate,
+      'appointmentTime.start': appointmentTime.start,
+      'appointmentTime.end': appointmentTime.end,
+      //isConfirmed: true,
+      status: 'confirmed',
+    });
+
+    if (trainerExistingAppointment) {
+      return res.status(400).json({ error: 'Trainer already has a confirmed appointment at this time' });
     }
 
     // Create and save appointment
@@ -54,6 +71,26 @@ const createAppointment = async (req, res) => {
     });
 
     const savedAppointment = await newAppointment.save();
+    const populatedAppointment = await Appointment.findById(savedAppointment._id)
+      .populate({
+        path: 'clientId',
+        populate: {
+          path: 'membership.type',
+          model: 'MembershipPackage'
+        }
+      })
+      .populate({
+        path: 'clientId',
+        populate: {
+          path: 'membership.purchaseHistory.packageType',
+          model: 'MembershipPackage'
+        }
+      })
+      .populate('trainerId');
+
+    const io = req.app.get('io');
+    io.emit('new_appointment', populatedAppointment);
+    console.log('New appointment event emitted');
     res.status(201).json({ message: 'Appointment created successfully', savedAppointment });
   } catch (error) {
     console.error('Error creating appointment:', error.message);
@@ -71,20 +108,69 @@ const confirmAppointment = async (req, res) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-     // Send notification to client (implement your notification logic here)
-     // await notifyClient(appointment.clientId, appointment);
-     // Generate a unique string for the QR code
-    const qrData = `${clientId}-${trainerId}-${appointmentDate}-${appointmentTime.start}`;
+    //check trainer availability
+    const trainerExistingAppointment = await Appointment.findOne({
+      trainerId: appointment.trainerId,
+      appointmentDate: appointment.appointmentDate,
+      'appointmentTime.start': appointment.appointmentTime.start,
+      'appointmentTime.end': appointment.appointmentTime.end,
+      status: 'confirmed',
+    });
+    if(trainerExistingAppointment){
+      console.log('Trainer already has a confirmed appointment at this time');
+      return res.status(400).json({ error: 'Trainer already has a confirmed appointment at this time' });
+    }
+    const qrData = `${appointment.clientId.client_uid}-${appointment.trainerId.trainer_uid}-${appointment.appointmentDate}-${appointment.appointmentTime.start}`;
 
     // Generate QR code (can also be a URL or base64)
     const qrCodeString = await QRCode.toDataURL(qrData);
-
-    appointment.isConfirmed = true;
     appointment.qrCode = { code: qrCodeString, isScanned: false };
+    appointment.status = 'confirmed';
+    const updatedAppointment = await appointment.save();
+    const populatedAppointment = await Appointment.findById(updatedAppointment._id)
+      .populate({
+        path: 'clientId',
+        populate: {
+          path: 'membership.type',
+          model: 'MembershipPackage'
+        }
+      })
+      .populate({
+        path: 'clientId',
+        populate: {
+          path: 'membership.purchaseHistory.packageType',
+          model: 'MembershipPackage'
+        }
+      })
+      .populate('trainerId');
+    const io = req.app.get('io');
+    io.emit('appointment_confirmed', { populatedAppointment });
+    res.status(200).json({ message: 'Appointment confirmed successfully', populatedAppointment });
+    console.log('Appointment confirmed successfully');
+
+  } catch (error){
+    res.status(500).json({ error: 'Error fetching appointment' });
+  }
+}
+
+const rejectAppointment = async (req, res) => {
+  const {appointmentId} = req.params;
+
+  try{
+
+    const appointment = await Appointment.findById(appointmentId);
+    if(!appointment){
+      return res.status(404).json({ error: 'Appointment not found' });
+    }
+    appointment.status = 'rejected';
     await appointment.save();
-
-    res.status(200).json({ message: 'Appointment confirmed successfully', appointment });
-
+    const eventData = {
+      appointmentId: appointment._id // Access appointment's _id from MongoDB document
+    };
+    const io = req.app.get('io');
+    io.emit('appointment_rejected', eventData);
+    console.log('Appointment rejected successfully', eventData);
+    res.status(200).json({ message: 'Appointment rejected successfully', eventData });
   } catch (error){
     res.status(500).json({ error: 'Error fetching appointment' });
   }
@@ -118,19 +204,19 @@ const getAppointmentsByTrainer = async (req, res) => {
 // Update appointment status
 const updateAppointmentStatus = async (req, res) => {
   const { appointmentId } = req.params;
-  const { status, isConfirmed } = req.body;
+  const { status } = req.body;
 
   try {
     const updatedAppointment = await Appointment.findByIdAndUpdate(
       appointmentId,
-      { status, isConfirmed },
-      { new: true }
+      { status },
+      { new : true }
     );
 
     if (!updatedAppointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
-
+    console.log('Appointment status updated successfully', updatedAppointment);
     res.status(200).json({ message: 'Appointment updated successfully', updatedAppointment });
   } catch (error) {
     console.error('Error updating appointment:', error.message);
@@ -171,6 +257,8 @@ const validateQRCode = async (req, res) => {
 
 module.exports = {
   createAppointment,
+  confirmAppointment,
+  rejectAppointment,
   getAllAppointments,
   getAppointmentsByTrainer,
   updateAppointmentStatus,

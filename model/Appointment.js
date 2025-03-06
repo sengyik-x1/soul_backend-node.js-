@@ -12,14 +12,18 @@ const appointmentSchema = new mongoose.Schema({
   serviceType: { type: String, required: true }, 
     status: { 
       type: String, 
-      enum: ['pending', 'in progress', 'complete'], 
+      enum: ['rejected', 'pending', 'confirmed', 'cancelled', 'complete','reported'], 
       default: 'pending' 
     },
-    isConfirmed: {
-        type: Boolean, 
-        default: false
+    // isConfirmed: {
+    //     type: Boolean, 
+    //     default: false
 
-    },
+    // },
+    // isRejected: {
+    //     type: Boolean, 
+    //     default: false
+    // },
     qrCode: { 
       code: { type: String }, // The QR code as a string (e.g., URL or base64-encoded image)
       isScanned: { type: Boolean, default: false } // Indicates if the QR code has been scanned

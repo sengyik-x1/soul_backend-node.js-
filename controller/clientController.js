@@ -1,5 +1,6 @@
 const Client = require('../model/Client');
 const User = require('../model/User');
+const Appointment = require('../model/Appointment');
 //const Payment = require('../model/Payment');
 const MembershipPackage = require('../model/MembershipPackages');
 //const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -139,4 +140,44 @@ const updateClientDetails = async (req, res) => {
 //     }
 // }
 
-module.exports = {createClient, getClientDetails, updateClientDetails };
+const getClientAppointments = async (req, res) => {
+    const { client_uid } = req.params;
+    try {
+        const client = await Client.findOne({
+            client_uid
+        });
+
+        if (!client) {
+            return res.status(404).json({ error: 'Client not found' });
+        }
+
+        const appointments = await Appointment.find({
+            clientId: client._id,
+            //status: 'confirmed'
+        })
+        .populate({
+            path: 'clientId',
+            populate: {
+              path: 'membership.type',
+              model: 'MembershipPackage'
+            }
+          })
+          .populate({
+            path: 'clientId',
+            populate: {
+              path: 'membership.purchaseHistory.packageType',
+              model: 'MembershipPackage'
+            }
+          })
+          .populate('trainerId');
+        console.log('Client\'s Appointments fetched successfully', appointments);
+        res.status(200).json(appointments);
+    } catch (error) {
+        console.error('Error fetching appointments:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+
+
+module.exports = {createClient, getClientDetails, updateClientDetails, getClientAppointments};

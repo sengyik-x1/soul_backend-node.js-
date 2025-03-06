@@ -155,10 +155,12 @@ clientSchema.methods.getFullMembershipDetails = function() {
 
 clientSchema.methods.deductPoints = function(points) {
   if (!this.membership || !this.membership.active) {
+    console.log('No active membership');
     throw new Error('No active membership');
   }
   
   if (this.membership.points < points) {
+    console.log('Insufficient points');
     throw new Error('Insufficient points');
   }
   

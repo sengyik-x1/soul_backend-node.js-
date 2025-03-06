@@ -16,8 +16,63 @@ const MembershipPackage = require('./model/MembershipPackages');
 dotenv.config();
 
 // Connect to the database
-connectDB();
+//connectDB();
+connectDB().then(() => { // Connect to DB and then execute schedule script
+  console.log("MongoDB connected for schedule initialization...");
 
+  // Fetch all existing trainer documents and initialize schedule
+  mongoose.connection.db.collection('trainers').find({}).forEach(function(trainer) { // Use mongoose.connection.db.collection('trainers')
+    if (!trainer.schedule || trainer.schedule.length === 0) { // Check if schedule is missing or empty
+      let schedule = [];
+
+      // Weekdays (Monday to Friday)
+      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+        const timeslots = [];
+        for (let hour = 8; hour < 20; hour++) {
+          timeslots.push({
+            startTime: `${hour}:00`,
+            endTime: `${hour + 1}:00`,
+            isAvailable: true
+          });
+        }
+        schedule.push({ dayOfWeek: day, timeslots });
+      });
+
+      // Saturday (8:00 to 17:00)
+      const saturdayTimeslots = [];
+      for (let hour = 8; hour < 17; hour++) {
+        saturdayTimeslots.push({
+          startTime: `${hour}:00`,
+          endTime: `${hour + 1}:00`,
+          isAvailable: true
+        });
+      }
+      schedule.push({ dayOfWeek: 'saturday', timeslots: saturdayTimeslots });
+
+      // Sunday (8:00 to 13:00)
+      const sundayTimeslots = [];
+      for (let hour = 8; hour < 13; hour++) {
+        sundayTimeslots.push({
+          startTime: `${hour}:00`,
+          endTime: `${hour + 1}:00`,
+          isAvailable: true
+        });
+      }
+      schedule.push({ dayOfWeek: 'sunday', timeslots: sundayTimeslots });
+
+      // Update the trainer document with the new schedule
+      mongoose.connection.db.collection('trainers').updateOne( // Use mongoose.connection.db.collection('trainers')
+        { _id: trainer._id }, // Target specific trainer using _id
+        { $set: { schedule: schedule } }
+      );
+      console.log(`Schedule initialized for trainer with trainer_uid: ${trainer.trainer_uid}`);
+    } else {
+      console.log(`Schedule already exists for trainer with trainer_uid: ${trainer.trainer_uid}`);
+    }
+  }, () => { // Callback after forEach is complete (important for async operations)
+    console.log("Schedule initialization process completed for all trainers checked.");
+  });
+});
 // Create collections if they do not exist
 const createCollections = async () => {
   try {
@@ -35,6 +90,7 @@ const createCollections = async () => {
   }
 };
 createCollections();
+
 
 // Initialize HTTP server and attach Express app
 const server = http.createServer(app);
