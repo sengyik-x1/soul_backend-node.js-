@@ -1,7 +1,7 @@
 const Appointment = require('../model/Appointment');
-const QRCode = require('qrcode');
 const Client = require('../model/Client');
 const Trainer = require('../model/Trainer');
+const ServiceType = require('../model/ServiceType');
 // Create a new appointment
 const createAppointment = async (req, res) => {
   const { clientUid, trainerUid, serviceType, appointmentDate, appointmentTime } = req.body;
@@ -18,6 +18,18 @@ const createAppointment = async (req, res) => {
     const bookingDate = new Date(appointmentDate);
     if (bookingDate < today) {
       return res.status(400).json({ error: 'Appointment date must be in the future' });
+    }
+
+    // Check if the appointment time is after the current time if the date is today
+    if (bookingDate.getTime() === today.getTime()) {
+      const currentTime = new Date();
+      const [startHours, startMinutes] = appointmentTime.start.split(':');
+      const appointmentStartTime = new Date();
+      appointmentStartTime.setHours(startHours, startMinutes, 0, 0);
+
+      if (appointmentStartTime <= currentTime) {
+        return res.status(400).json({ error: 'Appointment start time must be after the current time' });
+      }
     }
 
     // Fetch client and trainer
@@ -47,8 +59,8 @@ const createAppointment = async (req, res) => {
       return res.status(400).json({ error: 'The selected time slot is already booked' });
     }
 
-     // Check if the trainer already has a confirmed appointment with any client at this time
-     const trainerExistingAppointment = await Appointment.findOne({
+    // Check if the trainer already has a confirmed appointment with any client at this time
+    const trainerExistingAppointment = await Appointment.findOne({
       trainerId: trainer._id,
       appointmentDate,
       'appointmentTime.start': appointmentTime.start,
@@ -100,11 +112,11 @@ const createAppointment = async (req, res) => {
 
 
 const confirmAppointment = async (req, res) => {
-  const { appointmentId} = req.params;
+  const { appointmentId } = req.params;
 
-  try{
+  try {
     const appointment = await Appointment.findById(appointmentId);
-    if(!appointment){
+    if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
@@ -116,15 +128,15 @@ const confirmAppointment = async (req, res) => {
       'appointmentTime.end': appointment.appointmentTime.end,
       status: 'confirmed',
     });
-    if(trainerExistingAppointment){
+    if (trainerExistingAppointment) {
       console.log('Trainer already has a confirmed appointment at this time');
       return res.status(400).json({ error: 'Trainer already has a confirmed appointment at this time' });
     }
-    const qrData = `${appointment.clientId.client_uid}-${appointment.trainerId.trainer_uid}-${appointment.appointmentDate}-${appointment.appointmentTime.start}`;
+    //const qrData = `${appointment.clientId.client_uid}-${appointment.trainerId.trainer_uid}-${appointment.appointmentDate}-${appointment.appointmentTime.start}`;
 
     // Generate QR code (can also be a URL or base64)
-    const qrCodeString = await QRCode.toDataURL(qrData);
-    appointment.qrCode = { code: qrCodeString, isScanned: false };
+    // const qrCodeString = await QRCode.toDataURL(qrData);
+    // appointment.qrCode = { code: qrCodeString, isScanned: false };
     appointment.status = 'confirmed';
     const updatedAppointment = await appointment.save();
     const populatedAppointment = await Appointment.findById(updatedAppointment._id)
@@ -148,18 +160,18 @@ const confirmAppointment = async (req, res) => {
     res.status(200).json({ message: 'Appointment confirmed successfully', populatedAppointment });
     console.log('Appointment confirmed successfully');
 
-  } catch (error){
+  } catch (error) {
     res.status(500).json({ error: 'Error fetching appointment' });
   }
 }
 
 const rejectAppointment = async (req, res) => {
-  const {appointmentId} = req.params;
+  const { appointmentId } = req.params;
 
-  try{
+  try {
 
     const appointment = await Appointment.findById(appointmentId);
-    if(!appointment){
+    if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
     appointment.status = 'rejected';
@@ -171,7 +183,7 @@ const rejectAppointment = async (req, res) => {
     io.emit('appointment_rejected', eventData);
     console.log('Appointment rejected successfully', eventData);
     res.status(200).json({ message: 'Appointment rejected successfully', eventData });
-  } catch (error){
+  } catch (error) {
     res.status(500).json({ error: 'Error fetching appointment' });
   }
 }
@@ -210,7 +222,7 @@ const updateAppointmentStatus = async (req, res) => {
     const updatedAppointment = await Appointment.findByIdAndUpdate(
       appointmentId,
       { status },
-      { new : true }
+      { new: true }
     );
 
     if (!updatedAppointment) {
@@ -226,33 +238,241 @@ const updateAppointmentStatus = async (req, res) => {
 
 //validateQRcode
 const validateQRCode = async (req, res) => {
-  const { appointmentId, qrCode } = req.body;
+  const { trainerId, appointmentId, } = req.body;
 
   try {
-    // Find the appointment
-    const appointment = await Appointment.findById(appointmentId);
+    // Find the appointment and populate client and service type
+    const appointment = await Appointment.findById(appointmentId)
+      .populate('clientId');
 
+    // Check if appointment exists
     if (!appointment) {
-      return res.status(404).json({ error: 'Appointment not found' });
+      console.log('Appointment not found');
+      return res.status(404).json({
+        success: false,
+        error: 'Appointment not found'
+      });
     }
 
-    // Check if the QR code matches
-    if (appointment.qrCode.code !== qrCode) {
-      return res.status(400).json({ error: 'Invalid QR code' });
+    const trainer = await Trainer.findOne({ trainer_uid: trainerId });
+    if (!trainer) {
+      console.log('Trainer not found');
+      return res.status(404).json({
+        success: false,
+        error: 'Trainer not found'
+      });
     }
 
-    // Update the QR code scan status and appointment state
-    appointment.qrCode.isScanned = true;
-    appointment.state = 'complete';
+    // Verify the trainer is the assigned trainer
+    if (appointment.trainerId.toString() !== trainer._id.toString()) {
+      console.log('You are not authorized to validate this appointment');
+      return res.status(403).json({
+        success: false,
+        error: 'You are not authorized to validate this appointment'
+      });
+    }
 
-    await appointment.save();
+    // Check if appointment is already completed
+    if (appointment.status === 'complete') {
+      console.log('This appointment has already been completed');
+      return res.status(400).json({
+        success: false,
+        error: 'This appointment has already been completed'
+      });
+    }
 
-    res.status(200).json({ message: 'QR code validated successfully', appointment });
+    // Validate the appointment date (only valid on the day of appointment)
+    const appointmentDate = new Date(appointment.appointmentDate);
+    const today = new Date();
+
+    // Reset time parts to compare just the dates
+    appointmentDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    if (appointmentDate.getTime() !== today.getTime()) {
+      console.log('QR code is only valid on the day of the appointment');
+      return res.status(400).json({
+        success: false,
+        error: 'QR code is only valid on the day of the appointment'
+      });
+    }
+
+    // Check if appointment status is confirmed
+    if (appointment.status !== 'confirmed') {
+      console.log('Cannot complete an appointment with status:', appointment.status);
+      return res.status(400).json({
+        success: false,
+        error: `Cannot complete an appointment with status: ${appointment.status}`
+      });
+    }
+
+    // Get the service type to determine points to deduct
+    const serviceType = await ServiceType.findOne({ name: appointment.serviceType });
+
+    if (!serviceType) {
+      return res.status(404).json({
+        success: false,
+        error: 'Service type not found'
+      });
+    }
+
+    const pointsToDeduct = 250;
+
+    // Get the client
+    const client = await Client.findById(appointment.clientId).populate('membership.type')
+      .populate('membership.purchaseHistory.packageType');
+    if (!client) {
+      console.log('(appmt-controller) Client not found');
+      return res.status(404).json({
+        success: false,
+        error: 'Client not found'
+      });
+    }
+
+    // Check if client has an active membership
+    if (!client.membership || !client.membership.isActive) {
+      return res.status(400).json({
+        success: false,
+        error: 'Client does not have an active membership'
+      });
+    }
+
+    // Check if client has enough points
+    if (client.membership.points < pointsToDeduct) {
+      return res.status(400).json({
+        success: false,
+        error: 'Client does not have enough points for this service'
+      });
+    }
+
+    try {
+      // Deduct points from client's membership
+      client.deductPoints(pointsToDeduct);
+
+      // Save the client with updated points
+      await client.save();
+
+      // Update the appointment status to complete
+      appointment.status = 'complete';
+      const updatedAppointment = await appointment.save();
+      const completedAppointment = await Appointment.findById(updatedAppointment._id)
+        .populate({
+          path: 'clientId',
+          populate: {
+            path: 'membership.type',
+            model: 'MembershipPackage'
+          }
+        })
+        .populate({
+          path: 'clientId',
+          populate: {
+            path: 'membership.purchaseHistory.packageType',
+            model: 'MembershipPackage'
+          }
+        })
+        .populate('trainerId');
+
+      const io = req.app.get('io');
+      io.emit('appointment_completed', { completedAppointment });
+      io.emit('points_deducted', { client });
+      // Return success response
+      res.status(200).json({
+      });
+      console.log('Appointment completed successfully and points deducted');
+    } catch (error) {
+      console.error('Error deducting points:', error.message);
+      return res.status(400).json({
+        success: false,
+        error: `Error deducting points: ${error.message}`
+      });
+
+    }
+
   } catch (error) {
     console.error('Error validating QR code:', error.message);
-    res.status(500).json({ error: 'Error validating QR code' });
+    res.status(500).json({
+      success: false,
+      error: 'Server error while validating QR code'
+    });
   }
 };
+
+//cancel appointment by client
+const cancelAppointment = async (req, res) => {
+  const {clientUid, appointmentId} = req.body;
+
+  try{
+    const client = await Client.findOne({client_uid: clientUid});
+    if(!client){
+      console.log('Client not found');
+      return res.status(404).json({error: 'Client not found'});
+    }
+
+    const appointment = await Appointment.findById(appointmentId);
+    if(!appointment){
+      console.log('Appointment not found');
+      return res.status(404).json({error: 'Appointment not found'});
+    }
+
+    //check if the appointment is confirmed
+    if(appointment.status !== 'confirmed'){
+      console.log('Appointment is not confirmed');
+      return res.status(400).json({error: 'Appointment is not confirmed'});
+    }
+
+    //check if the appointment date is in the future and not today at least one hour before the appointment's start time
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const appointmentDate = new Date(appointment.appointmentDate);
+    appointmentDate.setHours(0,0,0,0);
+    if(appointmentDate.getTime() < today.getTime()){
+      console.log('Cannot cancel appointment on past date');
+      return res.status(400).json({error: 'Cannot cancel appointment on past date'});
+    }
+    else if(appointmentDate.getTime() === today.getTime()){
+      const currentTime = new Date();
+      const [startHours, startMinutues] = appointment.appointmentTime.start.split(':');
+      const appointmentStartTime = new Date();
+      appointmentStartTime.setHours(startHours, startMinutues, 0, 0);
+      const timeDifference = (appointmentStartTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60);
+      if(timeDifference < 1){
+        console.log('Cannot cancel appointment within one hour of start time');
+        return res.status(400).json({error: 'Cannot cancel appointment within one hour of start time'});
+      }
+    }
+    
+
+    //update appointment status to cancelled
+    appointment.status = 'cancelled';
+    const updatedAppointment = await appointment.save();
+    const cancelledAppointment = await Appointment.findById(updatedAppointment._id)
+    .populate({
+      path: 'clientId',
+      populate: {
+        path: 'membership.type',
+        model: 'MembershipPackage'
+      }
+    })
+    .populate({
+      path: 'clientId',
+      populate: {
+        path: 'membership.purchaseHistory.packageType',
+        model: 'MembershipPackage'
+      }
+    })
+    .populate('trainerId');
+
+    const io = req.app.get('io');
+    io.emit('appointment_cancelled', {cancelledAppointment});
+    console.log('Appointment cancelled successfully');
+    res.status(200).json({message: 'Appointment cancelled successfully', cancelledAppointment});
+
+  }catch(error){
+    console.error('Error cancelling appointment:', error.message);
+    res.status(500).json({error: 'Error cancelling appointment'});
+  }
+
+}
 
 
 module.exports = {
@@ -263,4 +483,5 @@ module.exports = {
   getAppointmentsByTrainer,
   updateAppointmentStatus,
   validateQRCode,
+  cancelAppointment
 };

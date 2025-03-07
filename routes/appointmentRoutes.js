@@ -7,6 +7,7 @@ const {
   getAppointmentsByTrainer,
   updateAppointmentStatus,
   validateQRCode,
+  cancelAppointment
 } = require('../controller/appmtController');
 const authenticateFirebaseToken = require('../middlewares/authMiddleware');
 
@@ -20,5 +21,6 @@ router.put('/:appointmentId/reject', authenticateFirebaseToken, rejectAppointmen
 router.get('/', authenticateFirebaseToken, getAllAppointments);
 router.get('/trainer/:trainerId', authenticateFirebaseToken, getAppointmentsByTrainer);
 router.put('/:appointmentId/status', authenticateFirebaseToken, updateAppointmentStatus);
+router.put('/:appointmentId/cancel', authenticateFirebaseToken, cancelAppointment);
 
 module.exports = router;

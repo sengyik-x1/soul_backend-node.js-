@@ -24,10 +24,10 @@ const appointmentSchema = new mongoose.Schema({
     //     type: Boolean, 
     //     default: false
     // },
-    qrCode: { 
-      code: { type: String }, // The QR code as a string (e.g., URL or base64-encoded image)
-      isScanned: { type: Boolean, default: false } // Indicates if the QR code has been scanned
-    }
+    // qrCode: { 
+    //   code: { type: String }, // The QR code as a string (e.g., URL or base64-encoded image)
+    //   isScanned: { type: Boolean, default: false } // Indicates if the QR code has been scanned
+    // }
   }, { timestamps: true });
 
 const Appointment = mongoose.model('Appointment', appointmentSchema);

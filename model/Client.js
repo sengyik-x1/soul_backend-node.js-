@@ -96,7 +96,7 @@ const clientSchema = new mongoose.Schema({
 
 // Helper methods for membership management
 clientSchema.methods.isEligibleForNewMembership = function() {
-  if (!this.membership || !this.membership.active) {
+  if (!this.membership || !this.membership.isActive) {
     return true;
   }
   
@@ -154,7 +154,7 @@ clientSchema.methods.getFullMembershipDetails = function() {
 };
 
 clientSchema.methods.deductPoints = function(points) {
-  if (!this.membership || !this.membership.active) {
+  if (!this.membership || !this.membership.isActive) {
     console.log('No active membership');
     throw new Error('No active membership');
   }

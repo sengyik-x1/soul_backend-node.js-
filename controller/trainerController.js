@@ -96,7 +96,14 @@ const getTrainerSchedule = async (req, res) => {
 
       console.log('Day schedule:', daySchedule);
 
-      const dayTimeslots = daySchedule.timeslots;
+      //const dayTimeslots = daySchedule.timeslots;
+      const currentTime = new Date();
+        const dayTimeslots = daySchedule.timeslots.filter(timeslot => {
+            const timeslotStartTime = new Date(selectedDate);
+            const [hours, minutes] = timeslot.startTime.split(':');
+            timeslotStartTime.setHours(hours, minutes, 0, 0);
+            return timeslotStartTime > currentTime;
+        });
 
         const bookedAppointments = await Appointment.find({
             trainerId: trainer._id,
