@@ -17,8 +17,8 @@ const authenticateFirebaseToken = async (req, res, next) => {
   const token = req.header('Authorization')?.split(' ')[1]; // Bearer token
 
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
     console.log('No token provided');
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
   }
 
   try {

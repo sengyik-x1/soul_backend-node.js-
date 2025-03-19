@@ -2,6 +2,8 @@ const Appointment = require('../model/Appointment');
 const Client = require('../model/Client');
 const Trainer = require('../model/Trainer');
 const ServiceType = require('../model/ServiceType');
+const User = require('../model/User');
+const notification = require('../services/notification');
 // Create a new appointment
 const createAppointment = async (req, res) => {
   const { clientUid, trainerUid, serviceType, appointmentDate, appointmentTime } = req.body;
@@ -38,6 +40,28 @@ const createAppointment = async (req, res) => {
 
     if (!client || !trainer) {
       return res.status(404).json({ error: 'Client or Trainer not found' });
+    }
+
+    //check if the client has sufficient points
+    if (client.membership.points < 250) {
+      return res.status(400).json({ error: 'Insufficient points' });
+    }
+
+    // Check if the client has an active membership
+    if (!client.membership || !client.membership.isActive) {
+      return res.status(400).json({ error: 'Client does not have an active membership' });
+    }
+
+    //check client membership points is sufficient for all the pending appointments in the future including the current appointment
+    const pendingAppointments = await Appointment.find({
+      clientId: client._id,
+      status: 'pending' || 'confirmed',
+      appointmentDate: { $gte: today },
+    });
+
+    const totalPointsRequired = pendingAppointments.length * 250;
+    if (client.membership.points < totalPointsRequired) {
+      return res.status(400).json({ error: 'Insufficient points for all pending appointments' });
     }
 
     // Check for overlapping appointments
@@ -103,12 +127,20 @@ const createAppointment = async (req, res) => {
     const io = req.app.get('io');
     io.emit('new_appointment', populatedAppointment);
     console.log('New appointment event emitted');
+    // Send notification to the trainer
+    const user = await User.findOne({ uid: trainerUid });
+    if (!user) {
+      return res.status(404).json({ error: 'Trainer not found' });
+    }
+    await notification.sendNewBookingNotificationToTrainer(user.fcmToken, populatedAppointment);
+    console.log('Notification sent to trainer');
     res.status(201).json({ message: 'Appointment created successfully', savedAppointment });
   } catch (error) {
     console.error('Error creating appointment:', error.message);
     res.status(500).json({ error: 'Error creating appointment' });
   }
 };
+
 
 
 const confirmAppointment = async (req, res) => {
@@ -157,6 +189,12 @@ const confirmAppointment = async (req, res) => {
       .populate('trainerId');
     const io = req.app.get('io');
     io.emit('appointment_confirmed', { populatedAppointment });
+    const user = await User.findOne({ uid: populatedAppointment.clientId.client_uid });
+    if (!user) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    notification.sendBookingConfirmationNotificationToClient(user.fcmToken, populatedAppointment);
+    console.log('Appointment Confirmed Notification sent to client');
     res.status(200).json({ message: 'Appointment confirmed successfully', populatedAppointment });
     console.log('Appointment confirmed successfully');
 
@@ -181,7 +219,19 @@ const rejectAppointment = async (req, res) => {
     };
     const io = req.app.get('io');
     io.emit('appointment_rejected', eventData);
-    console.log('Appointment rejected successfully', eventData);
+    console.log('Appointment rejected successfully');
+    const client = await Client.findById(appointment.clientId);
+    if (!client) {
+      console.log('(reject-appt) Client not found');
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    const user = await User.findOne({ uid: client.client_uid });
+    if (!user) {
+      console.log('(reject-appt) User not found');
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    notification.sendBookingRejectedNotificationToClient(user.fcmToken, appointment);
+    console.log('Appointment Rejected Notification sent to client');
     res.status(200).json({ message: 'Appointment rejected successfully', eventData });
   } catch (error) {
     res.status(500).json({ error: 'Error fetching appointment' });
@@ -228,7 +278,7 @@ const updateAppointmentStatus = async (req, res) => {
     if (!updatedAppointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
-    console.log('Appointment status updated successfully', updatedAppointment);
+    console.log('Appointment status updated successfully');
     res.status(200).json({ message: 'Appointment updated successfully', updatedAppointment });
   } catch (error) {
     console.error('Error updating appointment:', error.message);
@@ -465,6 +515,13 @@ const cancelAppointment = async (req, res) => {
     const io = req.app.get('io');
     io.emit('appointment_cancelled', {cancelledAppointment});
     console.log('Appointment cancelled successfully');
+    const user = await User.findOne({uid: cancelledAppointment.trainerId.trainer_uid});
+    if(!user){
+      console.log('Client not found');
+      return res.status(404).json({error: 'Client not found'});
+    }
+    notification.sendBookingCancellationNotificationToTrainer(user.fcmToken, cancelledAppointment);
+    console.log('Cancelled Appointment Notification sent to trainer');
     res.status(200).json({message: 'Appointment cancelled successfully', cancelledAppointment});
 
   }catch(error){

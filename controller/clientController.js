@@ -170,7 +170,7 @@ const getClientAppointments = async (req, res) => {
             }
           })
           .populate('trainerId');
-        console.log('Client\'s Appointments fetched successfully', appointments);
+        console.log('Client\'s Appointments fetched successfully');
         res.status(200).json(appointments);
     } catch (error) {
         console.error('Error fetching appointments:', error);

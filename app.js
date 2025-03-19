@@ -6,6 +6,7 @@ const trainerRoutes = require('./routes/trainerRoutes');
 const membershipPackageRoutes = require('./routes/membershipPackageRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 // const registerRoutes = require('./routes/registerRoute');
 // const middlewares = require('./middlewares/authMiddleware');
 const cors = require('cors');
@@ -29,5 +30,6 @@ app.use('/api/membership-packages', membershipPackageRoutes); // Membership pack
 app.use('/api/clients', clientRoutes); // Client routes
 app.use('/api/payments', paymentRoutes); // Payment routes
 // app.use('/api/auth', registerRoutes); // Register routes
+app.use('/api/reports', reportRoutes); // Report routes
 
 module.exports = app;

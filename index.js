@@ -11,6 +11,7 @@ const Admin = require('./model/Admin');
 const Client = require('./model/Client');
 const Trainer = require('./model/Trainer');
 const MembershipPackage = require('./model/MembershipPackages');
+const admin = require('firebase-admin');
 
 // Load environment variables
 dotenv.config();
@@ -105,6 +106,23 @@ const io = new Server(server, {
 
 // Attach `io` to the Express app for use in routes or controllers
 app.set('io', io);
+//io use middleware for authentication
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token || socket.handshake.query.token;
+    if (!token) {
+      return next(new Error('Unauthorized: No token provided'));
+    }
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    socket.user = decodedToken;
+    socket.userId = decodedToken.uid;
+    console.log('Authenticated socket:', socket.userId);
+    next();
+  } catch (error) {
+    console.error('Socket authentication failed:', error.message);
+    return next(new Error('Unauthorized: Invalid or expired token'));
+  }
+})
 
 // Handle WebSocket events
 io.on('connection', (socket) => {

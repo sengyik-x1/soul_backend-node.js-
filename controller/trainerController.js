@@ -134,7 +134,7 @@ const getTrainerSchedule = async (req, res) => {
         }
 
         res.status(200).json({ availableTimeSlots });
-        console.log('Available timeslots of trainer ' + trainer.email + ' fetched successfully on date:', date, availableTimeSlots);
+        console.log('Available timeslots of trainer ' + trainer.email + ' fetched successfully on date:', date);
 
     } catch (error) {
         console.error('Error fetching available timeslots:', error);
@@ -217,7 +217,7 @@ const updateTimeslotAvailability = async (req, res) => {
         }
       })
       .populate('trainerId');
-      console.log('Trainer\'s Appointments fetched successfully', appointments);
+      console.log('Trainer\'s Appointments fetched successfully');
       res.status(200).json(appointments);
     } catch (error) {
       console.error('Error fetching appointments:', error);
@@ -263,5 +263,6 @@ const updateTimeslotAvailability = async (req, res) => {
       res.status(500).json({ error: 'Internal server error' });
     }
   }
+
 
 module.exports = { getAllTrainers , getTrainer , getTrainerSchedule , getAvailableTimeslots, updateTimeslotAvailability, getTrainerAppointments};

@@ -27,10 +27,14 @@ const getFpxBanks = async (req, res) => {
 const createPaymentIntent = async (req, res) => {
   const { membershipName, clientUid} = req.body;
 
+  
   // Log the request body
   console.log('Request body:', req.body);
 
   try {
+    if (!membershipName || !clientUid) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
     // Fetch client by client_uid
     const client = await Client.findOne({ client_uid: clientUid });
     if (!client) {
@@ -38,6 +42,9 @@ const createPaymentIntent = async (req, res) => {
     }
 
     const membershipPackage = await MembershipPackage.findOne({ name: membershipName });
+    if (!membershipPackage) {
+      return res.status(404).json({ error: 'Membership package not found' });
+    }
     console.log('Membership package:', membershipPackage);
     // Fetch membership package and create payment intent
     const paymentIntent = await PaymentService.createPaymentIntent(membershipPackage._id, client._id);
