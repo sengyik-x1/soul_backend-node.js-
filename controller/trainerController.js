@@ -166,7 +166,7 @@ const updateTimeslotAvailability = async (req, res) => {
 
        // Find the day schedule and update it
        const dayScheduleIndex = trainer.schedule.findIndex(
-        schedule => schedule.dayOfWeek === scheduleOfDay.dayOfWeek
+        schedule => schedule.dayOfWeek === scheduleOfDay.dayOfWeek.toLowerCase()
     );
     
     if (dayScheduleIndex !== -1) {
@@ -179,7 +179,7 @@ const updateTimeslotAvailability = async (req, res) => {
     await trainer.save();
     console.log('Timeslots updated successfully');
 
-      res.status(200).json({ message: 'Timeslots updated successfully', updatedTrainerTimeSlots });
+      res.status(200).json({ message: 'Timeslots updated successfully', updatedSchedule: trainer.schedule[dayScheduleIndex] });
   } catch (error) {
       console.error('Error updating timeslots:', error.message);
       res.status(500).json({ error: 'Error updating timeslots' });

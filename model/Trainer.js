@@ -16,7 +16,9 @@ const trainerSchema = new mongoose.Schema({
   trainer_uid: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   name: { type: String },
+  phoneNumber: { type: String },
   position: { type: String },
+  description: { type: String },
   totalClassConducted: { type: Number, default: 0 },
   schedule: [dayScheduleSchema],
 });
