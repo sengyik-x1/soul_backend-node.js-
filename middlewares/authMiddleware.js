@@ -4,7 +4,14 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 // Initialize Firebase Admin SDK
-const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH);
+// const serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH);
+let serviceAccount;
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  // Fallback for local development
+  serviceAccount = require('../config/serviceAccountKey.json');
+}
 
 if (!admin.apps.length) {
   admin.initializeApp({
