@@ -10,7 +10,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 } else {
   // Fallback for local development
-  serviceAccount = require('../config/serviceAccountKey.json');
+  serviceAccount = require(process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH);
 }
 
 if (!admin.apps.length) {
