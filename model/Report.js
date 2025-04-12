@@ -53,7 +53,6 @@ const reportSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Appointment',
         required: true,
-        unique: true
     },
     exercises: [exerciseEntrySchema],
     subtotalTrainingVolume: {
