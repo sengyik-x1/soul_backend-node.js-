@@ -7,27 +7,27 @@ const MembershipPackage = require('../model/MembershipPackages');
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const getFpxBanks = async (req, res) => {
-    try {
-        // const fpxBanks = await stripe.sources.list({
-        //     type: 'fpx',
-        //   });
-        // console.log('FPX banks fetched successfully: ', fpxBanks.data);
-        const elements = stripe.elements();
-        const fpxBanks = await elements.create('fpxBank', {
-            account_holder_type: 'individual',
-        });
-        console.log('FPX banks fetched successfully: ', fpxBanks);
-        res.json(fpxBanks);
-      } catch (error) {
-        console.error('Error fetching FPX banks:', error.message);
-        res.status(500).json({ error: error.message });
-      }
+  try {
+    // const fpxBanks = await stripe.sources.list({
+    //     type: 'fpx',
+    //   });
+    // console.log('FPX banks fetched successfully: ', fpxBanks.data);
+    const elements = stripe.elements();
+    const fpxBanks = await elements.create('fpxBank', {
+      account_holder_type: 'individual',
+    });
+    console.log('FPX banks fetched successfully: ', fpxBanks);
+    res.json(fpxBanks);
+  } catch (error) {
+    console.error('Error fetching FPX banks:', error.message);
+    res.status(500).json({ error: error.message });
+  }
 }
 
 const createPaymentIntent = async (req, res) => {
-  const { membershipName, clientUid} = req.body;
+  const { membershipName, clientUid } = req.body;
 
-  
+
   // Log the request body
   console.log('Request body:', req.body);
 
@@ -48,7 +48,7 @@ const createPaymentIntent = async (req, res) => {
     console.log('Membership package:', membershipPackage);
     // Fetch membership package and create payment intent
     const paymentIntent = await PaymentService.createPaymentIntent(membershipPackage._id, client._id);
-    res.status(200).json({ clientSecret: paymentIntent.client_secret , paymentIntentId: paymentIntent.id});
+    res.status(200).json({ clientSecret: paymentIntent.client_secret, paymentIntentId: paymentIntent.id });
   } catch (error) {
     console.error('Error creating payment intent:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -56,7 +56,7 @@ const createPaymentIntent = async (req, res) => {
 }
 
 const handleStripeWebhook = async (req, res) => {
-    const sig = req.headers['stripe-signature'];
+  const sig = req.headers['stripe-signature'];
   let event;
 
   try {
@@ -71,7 +71,7 @@ const handleStripeWebhook = async (req, res) => {
         console.log('Payment intent succeeded');
         const paymentIntent = event.data.object;
         const { clientId, membershipPackageId } = paymentIntent.metadata;
-        
+
         try {
 
           const clientObjectId = new mongoose.Types.ObjectId(clientId);
@@ -84,8 +84,8 @@ const handleStripeWebhook = async (req, res) => {
 
           if (!client || !membershipPackage) {
             console.error('Client or membership package not found');
-            return res.status(404).json({ 
-              error: `${!client ? 'Client' : 'Membership package'} not found` 
+            return res.status(404).json({
+              error: `${!client ? 'Client' : 'Membership package'} not found`
             });
           }
 
@@ -125,9 +125,9 @@ const handleStripeWebhook = async (req, res) => {
         } catch (error) {
           console.error('Error processing successful payment:', error);
           // Still send 200 to Stripe but log the error
-          return res.status(200).json({ 
+          return res.status(200).json({
             received: true,
-            error: error.message 
+            error: error.message
           });
         }
         break;
@@ -149,5 +149,5 @@ const handleStripeWebhook = async (req, res) => {
   }
 }
 
-module.exports = {createPaymentIntent, handleStripeWebhook, getFpxBanks};
+module.exports = { createPaymentIntent, handleStripeWebhook, getFpxBanks };
 

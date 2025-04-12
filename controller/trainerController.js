@@ -7,6 +7,7 @@ const Client = require('../model/Client');
 const getAllTrainers = async (req, res) => {
   try {
     const trainers = await Trainer.find();
+    console.log('All trainers fetched successfully');
     res.status(200).json(trainers);
   } catch (error) {
     console.error('Error fetching trainers:', error);
@@ -34,6 +35,89 @@ const getTrainer = async (req, res) => {
     console.error('Error fetching trainer details:', error.message);
     res.status(500).json({error: 'Internal server error'});
 }
+};
+
+//update trainer profile
+const updateTrainerProfile = async (req, res) => {
+  const {
+    trainer_uid,
+    email,
+    phoneNumber,
+    name,
+    position,
+    description,
+    totalClassConducted,
+    schedule
+  } = req.body;
+
+  if (!trainer_uid) {
+    console.log('Trainer ID is required');
+    return res.status(400).json({ error: 'Trainer ID is required' });
+  }
+
+  try {
+    const trainer = await Trainer.findOne({ trainer_uid });
+    
+    if (!trainer) {
+      console.log('Trainer not found');
+      return res.status(404).json({ error: 'Trainer not found' });
+    }
+
+    // Update basic profile information
+    trainer.email = email || trainer.email;
+    trainer.phoneNumber = phoneNumber || trainer.phoneNumber;
+    trainer.name = name || trainer.name;
+    trainer.position = position || trainer.position;
+    trainer.description = description || trainer.description;
+    
+    // Only update totalClassConducted if it's provided and greater than current value
+    if (totalClassConducted !== undefined && totalClassConducted >= trainer.totalClassConducted) {
+      trainer.totalClassConducted = totalClassConducted;
+    }
+
+    // Update schedule if provided
+    if (schedule && Array.isArray(schedule)) {
+      // Process the schedule array from frontend
+      const processedSchedule = schedule.map(day => {
+        // Ensure dayOfWeek is in lowercase for consistency
+        const dayOfWeek = day.dayOfWeek.toLowerCase();
+        
+        // Map timeslots from frontend format to backend format
+        const timeslots = day.timeslots.map(slot => ({
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          isAvailable: slot.isAvailable
+        }));
+
+        return {
+          dayOfWeek,
+          timeslots
+        };
+      });
+
+      // Replace schedule with the processed one
+      trainer.schedule = processedSchedule;
+    }
+
+    await trainer.save();
+    console.log('Trainer profile updated successfully');
+    res.status(200).json({ 
+      message: 'Trainer profile updated successfully', 
+      trainer 
+    });
+    
+  } catch (error) {
+    console.error('Error updating trainer profile:', error.message);
+    
+    // Handle duplicate key errors specifically
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        error: 'Email already in use by another trainer' 
+      });
+    }
+    
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };
 
 // Fetch available timeslots for a trainer
@@ -265,4 +349,4 @@ const updateTimeslotAvailability = async (req, res) => {
   }
 
 
-module.exports = { getAllTrainers , getTrainer , getTrainerSchedule , getAvailableTimeslots, updateTimeslotAvailability, getTrainerAppointments};
+module.exports = { getAllTrainers , getTrainer, updateTrainerProfile , getTrainerSchedule , getAvailableTimeslots, updateTimeslotAvailability, getTrainerAppointments};

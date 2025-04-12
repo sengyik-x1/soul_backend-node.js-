@@ -67,7 +67,6 @@ const createAppointment = async (req, res) => {
     // Check for overlapping appointments
     const existingAppointment = await Appointment.findOne({
       trainerId: trainer._id,
-      serviceType,
       appointmentDate,
       // $or: [
       //   { 'appointmentTime.start': { $lt: appointmentTime.end, $gte: appointmentTime.start } },

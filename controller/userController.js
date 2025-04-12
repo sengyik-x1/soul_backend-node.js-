@@ -1,6 +1,9 @@
 const User = require('../model/User');
 const deviceTokens = new Map();
 const admin = require('firebase-admin');
+const Client = require('../model/Client');
+const Trainer = require('../model/Trainer');
+const Admin = require('../model/Admin');
 
 // Register a new user
 const registerUser = async (req, res) => {
@@ -9,6 +12,18 @@ const registerUser = async (req, res) => {
   try {
     const newUser = new User({ uid, email, role });
     const result = await newUser.save();
+    if(newUser.role === 'client'){
+      await Client.create({ client_uid: newUser.uid , email: newUser.email});
+      console.log(`Client record created for user: ${newUser.email}`);
+    }
+    else if(newUser.role === 'trainer'){
+      await Trainer.create({ trainer_uid: newUser.uid , email: newUser.email});
+      console.log(`Trainer record created for user: ${newUser.email}`);
+    }
+    else if(newUser.role === 'admin'){
+      await Admin.create({ admin_uid: newUser.uid , email: newUser.email});
+      console.log(`Admin record created for user: ${newUser.email}`);
+    }
     console.log("The result is: " + result);
     res.status(201).json({ message: 'User registered successfully', newUser });
   } catch (error) {

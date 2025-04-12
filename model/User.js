@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const userSchema = new mongoose.Schema({
   uid: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
-  role: { type: String, enum: ['client', 'trainer', 'admin'], default: 'client' },
+  role: { type: String, enum: ['client', 'trainer', 'admin', 'superAdmin'], default: 'client' },
   fcmToken: { 
     type: String,
     default: null
