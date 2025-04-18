@@ -2,7 +2,7 @@ const Trainer = require('../model/Trainer');
 const Appointment = require('../model/Appointment');
 const { updateAppointmentStatus } = require('./appmtController');
 const Client = require('../model/Client');
-const dateFnsTz = require('date-fns-tz');
+
 
 //Fetch all trainers
 const getAllTrainers = async (req, res) => {
@@ -161,6 +161,14 @@ const getAvailableTimeslots = async (req, res) => {
   }
 
   try{
+      // Get current time in Malaysia timezone (UTC+8)
+      const now = new Date();
+      const utcTime = now.getTime();
+      // Create Malaysia time by adding 8 hours to UTC
+      const malaysiaTime = new Date(utcTime + (8 * 60 * 60 * 1000));
+      
+      console.log('Current time (UTC):', now.toISOString());
+      console.log('Current time (Malaysia):', malaysiaTime.toISOString());
 
       const selectedDate = new Date(date);
       console.log('Selected date:', selectedDate);
@@ -175,19 +183,18 @@ const getAvailableTimeslots = async (req, res) => {
 
       const daySchedule = trainer.schedule.find(schedule => schedule.dayOfWeek === dayOfWeek);
       if (!daySchedule) {
-        console.log('Traienr not working on this day');
-        return res.status(200).json({ availableTimeSlots: [], message: 'No schedule found for this day.' }); // Trainer not working on this day
-    }
+        console.log('Trainer not working on this day');
+        return res.status(200).json({ availableTimeSlots: [], message: 'No schedule found for this day.' });
+      }
 
-    console.log('Day schedule:', daySchedule);
+      console.log('Day schedule:', daySchedule);
 
-    //const dayTimeslots = daySchedule.timeslots;
-    const currentTime = new Date();
+      // Use malaysiaTime for filtering
       const dayTimeslots = daySchedule.timeslots.filter(timeslot => {
           const timeslotStartTime = new Date(selectedDate);
           const [hours, minutes] = timeslot.startTime.split(':');
           timeslotStartTime.setHours(hours, minutes, 0, 0);
-          return timeslotStartTime > currentTime;
+          return timeslotStartTime > malaysiaTime;
       });
 
       const bookedAppointments = await Appointment.find({
@@ -195,15 +202,15 @@ const getAvailableTimeslots = async (req, res) => {
           appointmentDate: selectedDate,
           status: 'confirmed',
       });
-    console.log('Booked appointments:', bookedAppointments);
+      console.log('Booked appointments:', bookedAppointments);
     
-    const availableTimeSlots = [];
+      const availableTimeSlots = [];
       
       for(const timeslot of dayTimeslots){
           timeslotStartTime = timeslot.startTime;
           timeslotEndTime = timeslot.endTime;
 
-        let isBooked = false;
+          let isBooked = false;
           for(const appointment of bookedAppointments){
             if(appointment.appointmentTime.start === timeslotStartTime && appointment.appointmentTime.end === timeslotEndTime){
               isBooked = true;
@@ -213,8 +220,7 @@ const getAvailableTimeslots = async (req, res) => {
           if(!isBooked && timeslot.isAvailable){
             availableTimeSlots.push({
               timeslot
-            }
-            );
+            });
           }
       }
 
