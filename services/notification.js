@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
 
-async function sendNewBookingNotificationToTrainer(trainerFcmToken, bookingDetails) {
+async function sendNewBookingNotificationToTrainer(trainerFcmToken, bookingDetails, targetUserUid) {
   // Ensure all data fields are strings
   const message = {
     notification: {
@@ -15,6 +15,7 @@ async function sendNewBookingNotificationToTrainer(trainerFcmToken, bookingDetai
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toISOString() : '', // Use toISOString for Date
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
       targetFcmToken: trainerFcmToken,
+      targetUserUid: targetUserUid, 
     },
     token: trainerFcmToken,
   };
@@ -29,7 +30,7 @@ async function sendNewBookingNotificationToTrainer(trainerFcmToken, bookingDetai
   }
 }
 
-async function sendBookingConfirmationNotificationToClient(clientFcmToken, bookingDetails) {
+async function sendBookingConfirmationNotificationToClient(clientFcmToken, bookingDetails, targetUserUid) {
   const message = {
     notification: {
       title: 'Booking Confirmed',
@@ -42,6 +43,7 @@ async function sendBookingConfirmationNotificationToClient(clientFcmToken, booki
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toString() : '',
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
       targetFcmToken: clientFcmToken,
+      targetUserUid: targetUserUid, 
     },
     token: clientFcmToken,
   };
@@ -56,7 +58,7 @@ async function sendBookingConfirmationNotificationToClient(clientFcmToken, booki
   }
 }
 
-async function sendBookingRejectedNotificationToClient(clientFcmToken, bookingDetails) {
+async function sendBookingRejectedNotificationToClient(clientFcmToken, bookingDetails, targetUserUid) {
   const message = {
     notification: {
       title: 'Booking Rejected',
@@ -69,6 +71,7 @@ async function sendBookingRejectedNotificationToClient(clientFcmToken, bookingDe
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toString() : '',
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
       targetFcmToken: clientFcmToken,
+      targetUserUid: targetUserUid,
     },
     token: clientFcmToken,
   };
@@ -83,7 +86,7 @@ async function sendBookingRejectedNotificationToClient(clientFcmToken, bookingDe
   }
 }
 
-async function sendBookingCancellationNotificationToTrainer(trainerFcmToken, bookingDetails) {
+async function sendBookingCancellationNotificationToTrainer(trainerFcmToken, bookingDetails, targetUserUid) {
   const message = {
     notification: {
       title: 'Booking Cancelled',
@@ -96,6 +99,7 @@ async function sendBookingCancellationNotificationToTrainer(trainerFcmToken, boo
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toString() : '',
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
       targetFcmToken: trainerFcmToken,
+      targetUserUid: targetUserUid,
     },
     token: trainerFcmToken,
   };
