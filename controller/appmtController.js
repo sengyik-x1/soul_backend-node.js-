@@ -132,7 +132,7 @@ const createAppointment = async (req, res) => {
       return res.status(404).json({ error: 'Trainer not found' });
     }
     await notification.sendNewBookingNotificationToTrainer(user.fcmToken, populatedAppointment);
-    console.log('Notification sent to trainer');
+    console.log('Notification sent to trainer', user.fcmToken);
     res.status(201).json({ message: 'Appointment created successfully', savedAppointment });
   } catch (error) {
     console.error('Error creating appointment:', error.message);
