@@ -14,6 +14,7 @@ async function sendNewBookingNotificationToTrainer(trainerFcmToken, bookingDetai
       serviceType: bookingDetails.serviceType ? bookingDetails.serviceType.toString() : '',
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toISOString() : '', // Use toISOString for Date
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
+      targetFcmToken: trainerFcmToken,
     },
     token: trainerFcmToken,
   };
@@ -40,6 +41,7 @@ async function sendBookingConfirmationNotificationToClient(clientFcmToken, booki
       serviceType: bookingDetails.serviceType ? bookingDetails.serviceType.toString() : '',
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toString() : '',
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
+      targetFcmToken: clientFcmToken,
     },
     token: clientFcmToken,
   };
@@ -66,6 +68,7 @@ async function sendBookingRejectedNotificationToClient(clientFcmToken, bookingDe
       serviceType: bookingDetails.serviceType ? bookingDetails.serviceType.toString() : '',
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toString() : '',
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
+      targetFcmToken: clientFcmToken,
     },
     token: clientFcmToken,
   };
@@ -92,6 +95,7 @@ async function sendBookingCancellationNotificationToTrainer(trainerFcmToken, boo
       serviceType: bookingDetails.serviceType ? bookingDetails.serviceType.toString() : '',
       appointmentDate: bookingDetails.appointmentDate ? bookingDetails.appointmentDate.toString() : '',
       appointmentTime: JSON.stringify(bookingDetails.appointmentTime || {}),
+      targetFcmToken: trainerFcmToken,
     },
     token: trainerFcmToken,
   };
