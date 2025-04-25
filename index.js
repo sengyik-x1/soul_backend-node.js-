@@ -125,19 +125,74 @@ io.use(async (socket, next) => {
 })
 
 // Handle WebSocket events
+
 io.on('connection', (socket) => {
   console.log(`Client connected: ${socket.id}`);
-
-  // Example: Handle messages from the client
-  socket.on('message', (data) => {
-    console.log('Message from client:', data);
+  
+  // Store user ID for tracking
+  const userId = socket.userId;
+  console.log(`User ${userId} connected with socket ${socket.id}`);
+  
+  // Setup heartbeat mechanism
+  socket.on('ping', (data, callback) => {
+    console.log(`Received ping from ${socket.id}`);
+    // If callback exists, call it (acknowledges the ping)
+    if (typeof callback === 'function') {
+      callback('pong');
+    }
+  });
+  
+  // Handle token refresh
+  socket.on('token_refresh', async (data, callback) => {
+    try {
+      const { token } = data;
+      if (!token) {
+        throw new Error('No token provided for refresh');
+      }
+      
+      // Verify the new token
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      
+      // Update socket user data
+      socket.user = decodedToken;
+      socket.userId = decodedToken.uid;
+      
+      console.log(`Token refreshed for user ${socket.userId}`);
+      
+      // Send success response
+      if (typeof callback === 'function') {
+        callback({ success: true });
+      }
+    } catch (error) {
+      console.error('Token refresh failed:', error.message);
+      if (typeof callback === 'function') {
+        callback({ 
+          success: false, 
+          error: error.message 
+        });
+      }
+    }
   });
 
   // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`);
+  socket.on('disconnect', (reason) => {
+    console.log(`Client ${socket.id} disconnected. Reason: ${reason}`);
   });
 });
+// io.on('connection', (socket) => {
+//   console.log(`Client connected: ${socket.id}`);
+
+//   // Example: Handle messages from the client
+//   socket.on('message', (data) => {
+//     console.log('Message from client:', data);
+//   });
+
+//   // Handle disconnection
+//   socket.on('disconnect', () => {
+//     console.log(`Client disconnected: ${socket.id}`);
+//   });
+// });
+
 
 // Start the server
 const PORT = process.env.PORT || 3000;
