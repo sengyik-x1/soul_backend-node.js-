@@ -12,6 +12,7 @@ const Client = require('./model/Client');
 const Trainer = require('./model/Trainer');
 const MembershipPackage = require('./model/MembershipPackages');
 const admin = require('firebase-admin');
+const PurchaseHistory = require('./model/PurchaseHistory');
 
 // Load environment variables
 dotenv.config();
@@ -84,6 +85,8 @@ const createCollections = async () => {
       Client.createCollection(),
       Trainer.createCollection(),
       MembershipPackage.createCollection(),
+      PurchaseHistory.createCollection(),
+
     ]);
     console.log('All collections created');
   } catch (err) {

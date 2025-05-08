@@ -5,6 +5,7 @@ const PaymentService = require('../services/paymentService');
 const Client = require('../model/Client');
 const MembershipPackage = require('../model/MembershipPackages');
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+const PurchaseHistory = require('../model/PurchaseHistory');
 
 const getFpxBanks = async (req, res) => {
   try {
@@ -90,23 +91,33 @@ const handleStripeWebhook = async (req, res) => {
           }
 
           // Create purchase history record
-          const purchaseRecord = {
-            packageType: membershipPackage._id,
-            purchaseDate: new Date(),
-            points: membershipPackage.points,
-            amount: paymentIntent.amount / 100, // Convert from cents to dollars
-            paymentId: paymentIntent.id
-          };
+          // const purchaseRecord = new PurchaseHistory({
+          //   client: client._id,
+          //   clientName: client.name,
+          //   clientEmail: client.email,
+          //   packageType: membershipPackage._id,
+          //   packageName: membershipPackage.name,
+          //   purchaseDate: new Date(),
+          //   points: membershipPackage.points,
+          //   amount: paymentIntent.amount / 100, // Convert from cents to dollars
+          //   paymentId: paymentIntent.id
+          // });
+
+          // Save the purchase record
+          // await purchaseRecord.save();
+          // console.log(`Created purchase history record: ${purchaseRecord._id}`);
+
+
 
           // If no membership exists, initialize the purchase history array
-          if (!client.membership) {
-            client.membership = {
-              purchaseHistory: []
-            };
-          }
+          // if (!client.membership) {
+          //   client.membership = {
+          //     purchaseHistory: []
+          //   };
+          // }
 
           // Activate the new membership
-          await client.activateNewMembership(membershipPackageId);
+          await client.activateNewMembership(membershipPackageId, paymentIntent.id);
 
           console.log(`Updated membership for client ${clientId}`);
 

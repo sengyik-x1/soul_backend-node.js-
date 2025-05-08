@@ -259,10 +259,58 @@ const getClientMonthlyTrainingVolume = async (req, res) => {
         }
 }
 
+const getAllReportsByClient = async (req, res) => {
+    const { clientUid } = req.params;
+
+    if (!clientUid) {
+        console.log('Client ID is required');
+        return res.status(400).json({ error: 'Client ID is required' });
+    }
+
+    try {
+        const client = await Client.findOne({ client_uid: clientUid });
+        if (!client) {
+            console.log('Client not found');
+            return res.status(404).json({ error: 'Client not found' });
+        }
+
+        const reports = await Report.find({ client: client._id })
+            .populate('trainer')
+            .populate('client')
+            .populate('appointment')
+            .populate('exercises');
+
+        const transformedReports = reports.map(report => ({
+            _id: report._id,
+            trainerUid: report.trainer.trainer_uid,
+            clientUid: report.client.client_uid,
+            appointment: report.appointment._id, // Keep appointment id for frontend
+            exercises: report.exercises,
+            rpeDailyRating: report.rpeDailyRating,
+            sorenessDailyRating: report.sorenessDailyRating,
+            specialConsiderations: report.specialConsiderations,
+            foodNotes: report.foodNotes,
+            waterNotes: report.waterNotes,
+            sleepNotes: report.sleepNotes,
+            reportStatus: report.reportStatus,
+            subtotalTrainingVolume: report.subtotalTrainingVolume,
+            appointmentDate: report.appointment.appointmentDate, // Include appointment date
+        }));
+
+        console.log('Reports fetched successfully', transformedReports);
+        return res.status(200).json({ reports: transformedReports });
+        
+    } catch (error) {
+        console.error('Error fetching reports:', error.message);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
 module.exports = {
     trainerInsertReport,
     trainerGetAllReports,
     getClientMonthlyTrainingVolume,
+    getAllReportsByClient,
 }
 
 

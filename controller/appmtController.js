@@ -114,13 +114,13 @@ const createAppointment = async (req, res) => {
           model: 'MembershipPackage'
         }
       })
-      .populate({
-        path: 'clientId',
-        populate: {
-          path: 'membership.purchaseHistory.packageType',
-          model: 'MembershipPackage'
-        }
-      })
+      // .populate({
+      //   path: 'clientId',
+      //   populate: {
+      //     path: 'membership.purchaseHistory.packageType',
+      //     model: 'MembershipPackage'
+      //   }
+      // })
       .populate('trainerId');
 
     const io = req.app.get('io');
@@ -178,13 +178,13 @@ const confirmAppointment = async (req, res) => {
           model: 'MembershipPackage'
         }
       })
-      .populate({
-        path: 'clientId',
-        populate: {
-          path: 'membership.purchaseHistory.packageType',
-          model: 'MembershipPackage'
-        }
-      })
+      // .populate({
+      //   path: 'clientId',
+      //   populate: {
+      //     path: 'membership.purchaseHistory.packageType',
+      //     model: 'MembershipPackage'
+      //   }
+      // })
       .populate('trainerId');
     const io = req.app.get('io');
     io.emit('appointment_confirmed', { populatedAppointment });
@@ -368,8 +368,7 @@ const validateQRCode = async (req, res) => {
     const pointsToDeduct = 250;
 
     // Get the client
-    const client = await Client.findById(appointment.clientId).populate('membership.type')
-      .populate('membership.purchaseHistory.packageType');
+    const client = await Client.findById(appointment.clientId).populate('membership.type');
     if (!client) {
       console.log('(appmt-controller) Client not found');
       return res.status(404).json({
@@ -412,13 +411,13 @@ const validateQRCode = async (req, res) => {
             model: 'MembershipPackage'
           }
         })
-        .populate({
-          path: 'clientId',
-          populate: {
-            path: 'membership.purchaseHistory.packageType',
-            model: 'MembershipPackage'
-          }
-        })
+        // .populate({
+        //   path: 'clientId',
+        //   populate: {
+        //     path: 'membership.purchaseHistory.packageType',
+        //     model: 'MembershipPackage'
+        //   }
+        // })
         .populate('trainerId');
 
       const io = req.app.get('io');
@@ -502,13 +501,13 @@ const cancelAppointment = async (req, res) => {
         model: 'MembershipPackage'
       }
     })
-    .populate({
-      path: 'clientId',
-      populate: {
-        path: 'membership.purchaseHistory.packageType',
-        model: 'MembershipPackage'
-      }
-    })
+    // .populate({
+    //   path: 'clientId',
+    //   populate: {
+    //     path: 'membership.purchaseHistory.packageType',
+    //     model: 'MembershipPackage'
+    //   }
+    // })
     .populate('trainerId');
 
     const io = req.app.get('io');

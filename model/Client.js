@@ -1,19 +1,6 @@
 const mongoose = require('mongoose');
 const MembershipPackage = require('./MembershipPackages');
-
-const purchaseHistorySchema = new mongoose.Schema({
-  packageType: { 
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'MembershipPackage'
-  },
-  purchaseDate: { 
-    type: Date, 
-    default: Date.now 
-  },
-  points: Number,
-  amount: Number,
-  paymentId: String
-}); 
+ 
 
 const membershipSchema = new mongoose.Schema({
   type: { 
@@ -37,8 +24,7 @@ const membershipSchema = new mongoose.Schema({
   isActive: { 
     type: Boolean, 
     default: false
-  },
-  purchaseHistory: [purchaseHistorySchema]
+  }
 });
 
 
@@ -104,7 +90,7 @@ clientSchema.methods.isEligibleForNewMembership = function() {
   return now > this.membership.endDate || this.membership.points < 250;
 };
 
-clientSchema.methods.activateNewMembership = async function(packageId) {
+clientSchema.methods.activateNewMembership = async function(packageId, paymentId) {
   try {
     // Fetch the package details from MembershipPackage collection
     const selectedPackage = await MembershipPackage.findById(packageId);
@@ -118,28 +104,50 @@ clientSchema.methods.activateNewMembership = async function(packageId) {
 
     // If there's an existing membership, store it in purchase history
     if (this.membership) {
-      if (!this.membership.purchaseHistory) {
-        this.membership.purchaseHistory = [];
-      }
-      
-      // Add current membership to purchase history
-      this.membership.purchaseHistory.push({
-        packageType: selectedPackage._id, // This is already an ObjectId
+      // Create a new purchase history record in the separate collection
+      const PurchaseHistory = mongoose.model('PurchaseHistory');
+      await PurchaseHistory.create({
+        client: this._id,
+        clientName: this.name,
+        clientEmail: this.email,
+        packageType: this.membership.type,
+        packageName: selectedPackage.name, // Assuming package has a name field
         purchaseDate: this.membership.startDate,
-        points: selectedPackage.points,
+        points: this.membership.points,
         amount: selectedPackage.price,
+        paymentId: paymentId || null
       });
+
     }
 
     // Set new membership
     this.membership = {
-      type: selectedPackage._id, // Store the ObjectId reference
+      type: selectedPackage._id,
       startDate,
       endDate,
       points: selectedPackage.points,
-      isActive: true,
-      purchaseHistory: this.membership ? this.membership.purchaseHistory : []
+      isActive: true
     };
+
+    try {
+      const PurchaseHistory = mongoose.model('PurchaseHistory');
+      const newPurchaseRecord = await PurchaseHistory.create({
+        client: this._id,
+        clientName: this.name,
+        clientEmail: this.email,
+        packageType: selectedPackage._id,
+        packageName: selectedPackage.name,
+        purchaseDate: startDate,
+        points: selectedPackage.points,
+        amount: selectedPackage.price,
+        paymentId: paymentId || null
+      });
+      
+      console.log('Created purchase history record for new membership:', newPurchaseRecord._id);
+    } catch (newPurchaseHistoryError) {
+      console.error('Failed to create purchase history record for new membership:', newPurchaseHistoryError);
+      // Continue even if purchase history fails
+    }
 
     return this.membership;
   } catch (error) {
@@ -147,10 +155,34 @@ clientSchema.methods.activateNewMembership = async function(packageId) {
   }
 };
 
+clientSchema.methods.getPurchaseHistory = async function() {
+  try {
+    const PurchaseHistory = mongoose.model('PurchaseHistory');
+    return await PurchaseHistory.find({ client: this._id })
+                               .populate('packageType')
+                               .sort({ purchaseDate: -1 });
+  } catch (error) {
+    throw new Error(`Failed to retrieve purchase history: ${error.message}`);
+  }
+};
+
 // Add a helper method to populate membership details
-clientSchema.methods.getFullMembershipDetails = function() {
-  return this.populate('membership.type')
-             .populate('membership.purchaseHistory.packageType');
+clientSchema.methods.getFullMembershipDetails = async function() {
+  try {
+    // Populate the membership type
+    await this.populate('membership.type');
+    
+    // Get purchase history from the separate collection
+    const purchaseHistory = await this.getPurchaseHistory();
+    
+    // Return combined data
+    return {
+      client: this,
+      purchaseHistory: purchaseHistory
+    };
+  } catch (error) {
+    throw new Error(`Failed to get full membership details: ${error.message}`);
+  }
 };
 
 clientSchema.methods.deductPoints = function(points) {

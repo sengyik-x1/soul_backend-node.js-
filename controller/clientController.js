@@ -50,8 +50,7 @@ const getClientDetails = async (req, res) => {
     try {
         // First find the client
         let client = await Client.findOne({ client_uid })
-                               .populate('membership.type')
-                               .populate('membership.purchaseHistory.packageType');
+                               .populate('membership.type');
 
         if (!client) {
             return res.status(404).json({ error: 'Client not found' });
@@ -162,13 +161,13 @@ const getClientAppointments = async (req, res) => {
               model: 'MembershipPackage'
             }
           })
-          .populate({
-            path: 'clientId',
-            populate: {
-              path: 'membership.purchaseHistory.packageType',
-              model: 'MembershipPackage'
-            }
-          })
+        //   .populate({
+        //     path: 'clientId',
+        //     populate: {
+        //       path: 'membership.purchaseHistory.packageType',
+        //       model: 'MembershipPackage'
+        //     }
+        //   })
           .populate('trainerId');
         console.log('Client\'s Appointments fetched successfully');
         res.status(200).json(appointments);

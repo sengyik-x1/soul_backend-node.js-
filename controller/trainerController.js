@@ -149,7 +149,7 @@ const getAvailableTimeslots = async (req, res) => {
   const { trainerUid, date } = req.body;
   console.log('Trainer ID:', trainerUid);
   console.log('Date:', date);
-  
+ 
   if(!trainerUid){
       console.log('Trainer ID is required');
       return res.status(400).json({error: 'Trainer ID and date are required'});
@@ -163,15 +163,13 @@ const getAvailableTimeslots = async (req, res) => {
   try{
       // Get current time in Malaysia timezone (UTC+8)
       const now = new Date();
-      const utcTime = now.getTime();
-      // Create Malaysia time by adding 8 hours to UTC
-      const malaysiaTime = new Date(utcTime + (8 * 60 * 60 * 1000));
+      // Get Malaysia hour and minute directly
+      const malaysiaHour = (now.getUTCHours() + 8) % 24; // Add 8 hours for Malaysia time
+      const malaysiaMinute = now.getUTCMinutes();
       
-      console.log('Current time (UTC):', now.toISOString());
-      console.log('Current time (Malaysia):', malaysiaTime.toISOString());
-
+      console.log('Current Malaysia time:', `${malaysiaHour}:${malaysiaMinute}`);
+      
       const selectedDate = new Date(date);
-      console.log('Selected date:', selectedDate);
       const dayOfWeek = selectedDate.toLocaleDateString('en-US', {weekday: 'long'}).toLowerCase();
       console.log('Day of week:', dayOfWeek);
 
@@ -189,13 +187,35 @@ const getAvailableTimeslots = async (req, res) => {
 
       console.log('Day schedule:', daySchedule);
 
-      // Use malaysiaTime for filtering
+      // Check if selected date is today
+      const today = new Date();
+      const isToday = selectedDate.getUTCDate() === today.getUTCDate() && 
+                      selectedDate.getUTCMonth() === today.getUTCMonth() && 
+                      selectedDate.getUTCFullYear() === today.getUTCFullYear();
+      
+      // Filter timeslots based on simple hour/minute comparison, but only if the date is today
       const dayTimeslots = daySchedule.timeslots.filter(timeslot => {
-          const timeslotStartTime = new Date(selectedDate);
-          const [hours, minutes] = timeslot.startTime.split(':');
-          timeslotStartTime.setHours(hours, minutes, 0, 0);
-          return timeslotStartTime > malaysiaTime;
+          const [slotHours, slotMinutes] = timeslot.startTime.split(':').map(Number);
+          
+          // If it's not today, keep all timeslots
+          if (!isToday) {
+              return true;
+          }
+          
+          // If it's today, only keep future timeslots
+          const isFutureTimeslot = (slotHours > malaysiaHour) || 
+                                  (slotHours === malaysiaHour && slotMinutes > malaysiaMinute);
+          
+          console.log(`Comparing timeslot ${timeslot.startTime}:`, 
+                    `slot time=${slotHours}:${slotMinutes}`, 
+                    `malaysiaTime=${malaysiaHour}:${malaysiaMinute}`,
+                    `Is today: ${isToday}`,
+                    `Is future timeslot: ${isFutureTimeslot}`);
+          
+          return isFutureTimeslot;
       });
+      
+      console.log('Filtered dayTimeslots:', JSON.stringify(dayTimeslots, null, 2));
 
       const bookedAppointments = await Appointment.find({
           trainerId: trainer._id,
@@ -203,12 +223,12 @@ const getAvailableTimeslots = async (req, res) => {
           status: 'confirmed',
       });
       console.log('Booked appointments:', bookedAppointments);
-    
+   
       const availableTimeSlots = [];
-      
+     
       for(const timeslot of dayTimeslots){
-          timeslotStartTime = timeslot.startTime;
-          timeslotEndTime = timeslot.endTime;
+          const timeslotStartTime = timeslot.startTime;
+          const timeslotEndTime = timeslot.endTime;
 
           let isBooked = false;
           for(const appointment of bookedAppointments){
@@ -225,6 +245,7 @@ const getAvailableTimeslots = async (req, res) => {
       }
 
       res.status(200).json({ availableTimeSlots });
+      console.log('Available timeslots:', availableTimeSlots);
       console.log('Available timeslots of trainer ' + trainer.email + ' fetched successfully on date:', date);
 
   } catch (error) {
@@ -300,13 +321,13 @@ const getTrainerAppointments = async (req, res) => {
           model: 'MembershipPackage'
         }
       })
-      .populate({
-        path: 'clientId',
-        populate: {
-          path: 'membership.purchaseHistory.packageType',
-          model: 'MembershipPackage'
-        }
-      })
+      // .populate({
+      //   path: 'clientId',
+      //   populate: {
+      //     path: 'membership.purchaseHistory.packageType',
+      //     model: 'MembershipPackage'
+      //   }
+      // })
       .populate('trainerId');
     console.log('Trainer\'s Appointments fetched successfully');
     res.status(200).json(appointments);
