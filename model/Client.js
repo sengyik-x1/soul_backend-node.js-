@@ -86,7 +86,7 @@ clientSchema.methods.isEligibleForNewMembership = function() {
     return true;
   }
   
-  const now = new Date();
+  const now = new Date(); 
   return now > this.membership.endDate || this.membership.points < 250;
 };
 

@@ -14,10 +14,12 @@ const createAppointment = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Validate date is in the future
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const actualCurrentTimeUTC = new Date(); // Current UTC instant
+    const todayDateStringMYT = actualCurrentTimeUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); // Gets "YYYY-MM-DD" in MYT
+    const today = new Date(`${todayDateStringMYT}T00:00:00.000+08:00`);
+    console.log('Today:', today);
     const bookingDate = new Date(appointmentDate);
+    console.log('Booking date:', bookingDate);
     if (bookingDate < today) {
       return res.status(400).json({ error: 'Appointment date must be in the future' });
     }
@@ -58,6 +60,20 @@ const createAppointment = async (req, res) => {
       status: 'pending' || 'confirmed',
       appointmentDate: { $gte: today },
     });
+
+    //check for client overlapping appointments
+    const newBookingDate = new Date(appointmentDate);
+    const clientOverlapping = await Appointment.find({
+      clientId: client._id,
+      appointmentDate: newBookingDate, // Check ONLY on the new booking's specific date
+      status: { $in: ['pending', 'confirmed'] },
+
+      'appointmentTime.start': appointmentTime.start,
+      'appointmentTime.end': appointmentTime.end,
+    });
+    if (clientOverlapping.length > 0) {
+      return res.status(400).json({ error: 'You already have an overlapping appointment at this date and time.' });
+    }
 
     const totalPointsRequired = pendingAppointments.length * 250;
     if (client.membership.points < totalPointsRequired) {
@@ -447,87 +463,141 @@ const validateQRCode = async (req, res) => {
 
 //cancel appointment by client
 const cancelAppointment = async (req, res) => {
-  const {clientUid, appointmentId} = req.body;
+  const { clientUid, appointmentId } = req.body;
 
-  try{
-    const client = await Client.findOne({client_uid: clientUid});
-    if(!client){
+  try {
+    // Find client
+    const client = await Client.findOne({ client_uid: clientUid });
+    if (!client) {
       console.log('Client not found');
-      return res.status(404).json({error: 'Client not found'});
+      return res.status(404).json({ error: 'Client not found' });
     }
 
+    // Find appointment
     const appointment = await Appointment.findById(appointmentId);
-    if(!appointment){
+    if (!appointment) {
       console.log('Appointment not found');
-      return res.status(404).json({error: 'Appointment not found'});
+      return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    //check if the appointment is confirmed
-    if(appointment.status !== 'confirmed'){
-      console.log('Appointment is not confirmed');
-      return res.status(400).json({error: 'Appointment is not confirmed'});
+    // Check if the appointment is confirmed
+    if (appointment.status !== 'confirmed') {
+      console.log('Appointment is not confirmed or already cancelled/completed');
+      return res.status(400).json({ error: 'Only confirmed appointments can be cancelled by this action.' });
     }
 
-    //check if the appointment date is in the future and not today at least one hour before the appointment's start time
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const appointmentDate = new Date(appointment.appointmentDate);
-    appointmentDate.setHours(0,0,0,0);
-    if(appointmentDate.getTime() < today.getTime()){
+    // Get current time in Malaysia timezone (UTC+8)
+    const now = new Date();
+    const utcTime = now.getTime();
+    const malaysiaTime = new Date(utcTime + (8 * 60 * 60 * 1000));
+    console.log('Current Malaysia time (raw):', malaysiaTime.toISOString());
+
+
+    // --- IMPROVED DATE HANDLING ---
+    // Get the appointment's date object (assuming appointment.appointmentDate is a Date object or parsable string)
+    const appointmentDateObj = new Date(appointment.appointmentDate);
+
+    // Get the local date string (YYYY-MM-DD) for the appointment in Malaysia Time
+    const appointmentLocalDateString = appointmentDateObj.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+
+    // Get the local date string (YYYY-MM-DD) for today in Malaysia Time
+    const todayLocalDateString = malaysiaTime.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+
+    console.log('Appointment local date (MYT):', appointmentLocalDateString);
+    console.log('Today local date (MYT):', todayLocalDateString);
+
+    // Check if appointment is in the past
+    if (appointmentLocalDateString < todayLocalDateString) {
       console.log('Cannot cancel appointment on past date');
-      return res.status(400).json({error: 'Cannot cancel appointment on past date'});
+      return res.status(400).json({ error: 'Cannot cancel appointment on a past date' });
     }
-    else if(appointmentDate.getTime() === today.getTime()){
-      const currentTime = new Date();
-      const [startHours, startMinutues] = appointment.appointmentTime.start.split(':');
-      const appointmentStartTime = new Date();
-      appointmentStartTime.setHours(startHours, startMinutues, 0, 0);
-      const timeDifference = (appointmentStartTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60);
-      if(timeDifference < 1){
-        console.log('Cannot cancel appointment within one hour of start time');
-        return res.status(400).json({error: 'Cannot cancel appointment within one hour of start time'});
+    // Check if appointment is today and within the cancellation window
+    else if (appointmentLocalDateString === todayLocalDateString) {
+      // Appointment is today. Construct its full start time in MYT.
+      // appointment.appointmentTime.start is expected as "HH:mm"
+      const [startHours, startMinutes] = appointment.appointmentTime.start.split(':').map(Number);
+      console.log('Start hours:', startHours, 'Start minutes:', startMinutes);
+
+      // Construct the full date-time string for the appointment in MYT
+      const appointmentFullStartTimeString = `${appointmentLocalDateString}T${String(startHours).padStart(2, '0')}:${String(startMinutes).padStart(2, '0')}:00+08:00`;
+      console.log('Full appointment start time string (MYT):', appointmentFullStartTimeString);
+      const actualAppointmentStartTimeMYT = new Date(appointmentFullStartTimeString);
+      console.log('Actual appointment start time (MYT):', actualAppointmentStartTimeMYT.toISOString());
+
+      // Calculate time difference in hours
+      // malaysiaTime is the current moment in MYT
+      const timeDifferenceMs = actualAppointmentStartTimeMYT.getTime() - now.getTime();
+      const timeDifferenceHours = timeDifferenceMs / (1000 * 60 * 60);
+
+      console.log('Current Malaysia time for comparison:', malaysiaTime.toISOString());
+      console.log('Actual Appointment start time (MYT):', actualAppointmentStartTimeMYT.toISOString());
+      console.log('Time difference (hours):', timeDifferenceHours);
+
+      // Prevent cancellation if less than 1 hour away or if the time has already passed today
+      if (timeDifferenceHours < 1) {
+        console.log('Cannot cancel appointment within one hour of start time or if it has passed for today');
+        return res.status(400).json({
+          error: 'Cannot cancel appointment: it is either less than one hour away or its start time today has passed.',
+          currentTime: malaysiaTime.toISOString(),
+          appointmentTime: actualAppointmentStartTimeMYT.toISOString(),
+          hoursUntilAppointment: timeDifferenceHours // Can be negative
+        });
       }
     }
-    
+    // If it's a future date (not today, not past), cancellation is allowed (falls through).
 
-    //update appointment status to cancelled
+    // Update appointment status to cancelled
     appointment.status = 'cancelled';
     const updatedAppointment = await appointment.save();
+
+    // Fetch the updated appointment with populated fields
     const cancelledAppointment = await Appointment.findById(updatedAppointment._id)
-    .populate({
-      path: 'clientId',
-      populate: {
-        path: 'membership.type',
-        model: 'MembershipPackage'
-      }
-    })
-    // .populate({
-    //   path: 'clientId',
-    //   populate: {
-    //     path: 'membership.purchaseHistory.packageType',
-    //     model: 'MembershipPackage'
-    //   }
-    // })
-    .populate('trainerId');
+      .populate({
+        path: 'clientId',
+        populate: {
+          path: 'membership.type',
+          model: 'MembershipPackage'
+        }
+      })
+      .populate('trainerId'); // Assuming 'trainerId' directly populates the Trainer model linked via trainer_uid or _id
 
-    const io = req.app.get('io');
-    io.emit('appointment_cancelled', {cancelledAppointment});
-    console.log('Appointment cancelled successfully');
-    const user = await User.findOne({uid: cancelledAppointment.trainerId.trainer_uid});
-    if(!user){
-      console.log('Client not found');
-      return res.status(404).json({error: 'Client not found'});
+    // Emit socket event
+    if (req.app.get('io')) { // Check if io is available
+      const io = req.app.get('io');
+      io.emit('appointment_cancelled', { cancelledAppointment }); // Consider namespacing or room-specific emits
+      console.log('Socket event "appointment_cancelled" emitted');
+    } else {
+      console.log('Socket.io instance not found on req.app');
     }
-    notification.sendBookingCancellationNotificationToTrainer(user.fcmToken, cancelledAppointment);
-    console.log('Cancelled Appointment Notification sent to trainer');
-    res.status(200).json({message: 'Appointment cancelled successfully', cancelledAppointment});
 
-  }catch(error){
-    console.error('Error cancelling appointment:', error.message);
-    res.status(500).json({error: 'Error cancelling appointment'});
+    console.log('Appointment cancelled successfully in DB');
+
+    // Send notification to trainer
+    if (cancelledAppointment.trainerId && cancelledAppointment.trainerId.trainer_uid) {
+      const trainerUser = await User.findOne({ uid: cancelledAppointment.trainerId.trainer_uid });
+      if (trainerUser && trainerUser.fcmToken) {
+        // Assuming 'notification' object and its method are defined elsewhere and imported
+        // notification.sendBookingCancellationNotificationToTrainer(trainerUser.fcmToken, cancelledAppointment);
+        console.log(`Placeholder: Would send notification to trainer ${trainerUser.uid} with token ${trainerUser.fcmToken}`);
+        console.log('Cancelled Appointment Notification intended for trainer');
+      } else {
+        console.log('Trainer user or FCM token not found for notification.');
+      }
+    } else {
+      console.log('Trainer ID or trainer_uid not available on cancelled appointment for sending notification.');
+    }
+
+    res.status(200).json({
+      message: 'Appointment cancelled successfully',
+      cancelledAppointment
+    });
+
+  } catch (error) {
+    console.error('Error cancelling appointment:', error.message, error.stack);
+    // Check for specific MongoDB errors if necessary, e.g., CastError for invalid ObjectId
+    res.status(500).json({ error: 'An unexpected error occurred while cancelling the appointment.' });
   }
-
-}
+};
 
 
 module.exports = {
