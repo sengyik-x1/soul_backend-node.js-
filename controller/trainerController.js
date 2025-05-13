@@ -376,5 +376,29 @@ const trainerUpdateAppointmentStatus = async (req, res) => {
   }
 }
 
+//update trainer profile url
+const updateTrainerProfileUrl = async (req, res) => {
+  const { trainerUid, profileUrl } = req.body;
 
-module.exports = { getAllTrainers, getTrainer, updateTrainerProfile, getTrainerSchedule, getAvailableTimeslots, updateTimeslotAvailability, getTrainerAppointments };
+  if (!trainerUid || !profileUrl) {
+    console.log('Trainer ID and profile URL are required');
+    return res.status(400).json({ error: 'Trainer ID and profile URL are required' });
+  }
+
+  try {
+    const trainer = await Trainer.findOne({ trainer_uid: trainerUid });
+    if (!trainer) {
+      console.log('Trainer not found');
+      return res.status(404).json({ error: 'Trainer not found' });
+    }
+    trainer.profileUrl = profileUrl;
+    await trainer.save();
+    console.log('Trainer profile URL updated successfully');
+    res.status(200).json({ message: 'Profile URL updated successfully', trainer });
+  } catch (error) {
+    console.error('Error updating trainer profile URL:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+module.exports = { getAllTrainers, getTrainer, updateTrainerProfile, getTrainerSchedule, getAvailableTimeslots, updateTimeslotAvailability, getTrainerAppointments, trainerUpdateAppointmentStatus, updateTrainerProfileUrl };

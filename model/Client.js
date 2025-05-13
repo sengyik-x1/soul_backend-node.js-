@@ -65,6 +65,7 @@ const clientSchema = new mongoose.Schema({
     type: String 
   }],
   membership: membershipSchema,
+  profileUrl: { type: String, default: null },
 }, { timestamps: true });
 
 // Calculate BMI method

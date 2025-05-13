@@ -21,6 +21,7 @@ const trainerSchema = new mongoose.Schema({
   description: { type: String },
   totalClassConducted: { type: Number, default: 0 },
   schedule: [dayScheduleSchema],
+  profileUrl: { type: String, default: null },
 });
 
 // Pre-save hook to initialize schedule with different hours per day

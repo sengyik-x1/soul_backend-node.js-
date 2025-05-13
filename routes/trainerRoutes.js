@@ -8,6 +8,7 @@ const {
   getAvailableTimeslots,
   updateTimeslotAvailability,
   getTrainerAppointments,
+  updateTrainerProfileUrl,
 
 } = require('../controller/trainerController');
 
@@ -20,5 +21,6 @@ router.get('/schedule/:trainerUid', authenticateFirebaseToken, getTrainerSchedul
 router.get('/appointments/:trainerUid', authenticateFirebaseToken, getTrainerAppointments); // Get all appointments for a trainer
 router.post('/timeslots/:trainerUid', authenticateFirebaseToken ,getAvailableTimeslots); // Get available timeslots for a trainer
 router.patch('/schedules/update', authenticateFirebaseToken ,updateTimeslotAvailability); // Update timeslot availability
+router.patch('/update-picture-url', authenticateFirebaseToken ,updateTrainerProfileUrl); // Update trainer profile URL
 
 module.exports = router;

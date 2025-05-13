@@ -177,6 +177,33 @@ const getClientAppointments = async (req, res) => {
     }
 }
 
+//client update profile url
+const updateClientProfileUrl = async (req, res) => {
+
+    const { clientUid, profileUrl } = req.body;
+
+  if (!clientUid || !profileUrl) {
+    console.log('Client ID and profile URL are required');
+    return res.status(400).json({ error: 'Client ID and profile URL are required' });
+  }
+
+  try {
+    const client = await Client.findOne({ client_uid: clientUid });
+    if (!client) {
+      console.log('Client not found');
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    client.profileUrl = profileUrl;
+    await client.save();
+    console.log('Client profile URL updated successfully');
+    res.status(200).json({ message: 'Profile URL updated successfully', client });
+  } catch (error) {
+    console.error('Error updating client profile URL:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+}
+    
 
 
-module.exports = {createClient, getClientDetails, updateClientDetails, getClientAppointments};
+
+module.exports = {createClient, getClientDetails, updateClientDetails, getClientAppointments, updateClientProfileUrl};
