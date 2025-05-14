@@ -439,6 +439,8 @@ const validateQRCode = async (req, res) => {
       const io = req.app.get('io');
       io.emit('appointment_completed', { completedAppointment });
       io.emit('points_deducted', { client });
+      trainer.totalClassConducted += 1;
+      await trainer.save();
       // Return success response
       res.status(200).json({
       });
