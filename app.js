@@ -7,6 +7,7 @@ const membershipPackageRoutes = require('./routes/membershipPackageRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const {scheduleMembershipCheck} = require('./jobs/membershipExpiryChecker');
 // const registerRoutes = require('./routes/registerRoute');
 // const middlewares = require('./middlewares/authMiddleware');
 const cors = require('cors');
@@ -31,5 +32,6 @@ app.use('/api/clients', clientRoutes); // Client routes
 app.use('/api/payments', paymentRoutes); // Payment routes
 // app.use('/api/auth', registerRoutes); // Register routes
 app.use('/api/reports', reportRoutes); // Report routes
+scheduleMembershipCheck();
 
 module.exports = app;

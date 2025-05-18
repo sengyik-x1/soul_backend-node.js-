@@ -56,6 +56,7 @@ const getClientDetails = async (req, res) => {
             return res.status(404).json({ error: 'Client not found' });
         }
 
+
         // Handle case where client exists but membership or membership.type is null
         if (client.membership && client.membership.type === null) {
             // You can either:
