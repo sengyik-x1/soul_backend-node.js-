@@ -4,6 +4,7 @@ const Trainer = require('../model/Trainer');
 const ServiceType = require('../model/ServiceType');
 const User = require('../model/User');
 const notification = require('../services/notification');
+
 // Create a new appointment
 const createAppointment = async (req, res) => {
   const { clientUid, trainerUid, serviceType, appointmentDate, appointmentTime } = req.body;
@@ -14,25 +15,34 @@ const createAppointment = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const actualCurrentTimeUTC = new Date(); // Current UTC instant
-    const todayDateStringMYT = actualCurrentTimeUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); // Gets "YYYY-MM-DD" in MYT
-    const today = new Date(`${todayDateStringMYT}T00:00:00.000+08:00`);
-    console.log('Today:', today);
-    const bookingDate = new Date(appointmentDate);
-    console.log('Booking date:', bookingDate);
-    if (bookingDate < today) {
-      return res.status(400).json({ error: 'Appointment date must be in the future' });
+    const actualCurrentTimeUTC = new Date(); 
+
+    const todayDateStringMYT = actualCurrentTimeUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+
+    const todayStartMYT = new Date(`${todayDateStringMYT}T00:00:00.000+08:00`);
+    
+    const bookingDateUTC = new Date(appointmentDate); 
+
+    console.log('Today (start of day in MYT, as UTC):', todayStartMYT.toISOString());
+    console.log('Booking date (UTC midnight):', bookingDateUTC.toISOString());
+
+    if (bookingDateUTC.getTime() < todayStartMYT.getTime() && bookingDateUTC.toDateString() !== todayStartMYT.toDateString()) {
+      console.log('Booking date is in the past:', bookingDateUTC.toISOString());
+        return res.status(400).json({ error: 'Appointment date must be today or in the future' });
     }
 
-    // Check if the appointment time is after the current time if the date is today
-    if (bookingDate.getTime() === today.getTime()) {
-      const currentTime = new Date();
-      const [startHours, startMinutes] = appointmentTime.start.split(':');
-      const appointmentStartTime = new Date();
-      appointmentStartTime.setHours(startHours, startMinutes, 0, 0);
+    const bookingDateMYTString = bookingDateUTC.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
 
-      if (appointmentStartTime <= currentTime) {
-        return res.status(400).json({ error: 'Appointment start time must be after the current time' });
+    if (bookingDateMYTString === todayDateStringMYT) {
+      const currentInstantMYT = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
+      const [startHours, startMinutes] = appointmentTime.start.split(':').map(Number);
+      
+      const appointmentStartTimeTodayMYT = new Date(currentInstantMYT); // Copy current date
+      appointmentStartTimeTodayMYT.setHours(startHours, startMinutes, 0, 0); // Set to booking time on today's date
+
+      if (appointmentStartTimeTodayMYT <= currentInstantMYT) {
+        console.log('Appointment start time is not in the future for today\'s bookings:', appointmentStartTimeTodayMYT.toISOString());
+        return res.status(400).json({ error: 'Appointment start time must be after the current time for today\'s bookings' });
       }
     }
 
@@ -44,79 +54,57 @@ const createAppointment = async (req, res) => {
       return res.status(404).json({ error: 'Client or Trainer not found' });
     }
 
-    //check if the client has sufficient points
-    if (client.membership.points < 250) {
-      return res.status(400).json({ error: 'Insufficient points' });
-    }
-
     // Check if the client has an active membership
     if (!client.membership || !client.membership.isActive) {
       return res.status(400).json({ error: 'Client does not have an active membership' });
     }
 
-    //check client membership points is sufficient for all the pending appointments in the future including the current appointment
-    const pendingAppointments = await Appointment.find({
+    const pointsRequiredForThisBooking = 250; // Assuming a fixed cost
+
+    // Fetch all existing future (or today) pending or confirmed appointments for this client
+    const existingFutureAppointments = await Appointment.find({
       clientId: client._id,
-      status: 'pending' || 'confirmed',
-      appointmentDate: { $gte: today },
+      status: { $in: ['pending', 'confirmed'] }, 
+      appointmentDate: { $gte: todayStartMYT }, // Compare with start of today in MYT
     });
 
-    //check for client overlapping appointments
-    const newBookingDate = new Date(appointmentDate);
-    const clientOverlapping = await Appointment.find({
+    // Calculate total points that would be committed including the new booking
+    const totalPointsCommittedWithNewBooking = (existingFutureAppointments.length * pointsRequiredForThisBooking) + pointsRequiredForThisBooking;
+
+    if (client.membership.points < totalPointsCommittedWithNewBooking) {
+      console.log('Insufficient points for booking:', client.membership.points, totalPointsCommittedWithNewBooking);
+      return res.status(400).json({
+        error: `Insufficient points. You have ${client.membership.points} points. This booking and other existing future bookings require a total of ${totalPointsCommittedWithNewBooking} points.`
+      });
+    }
+
+    const clientOverlapping = await Appointment.findOne({ // findOne is sufficient if you only need to know if one exists
       clientId: client._id,
-      appointmentDate: newBookingDate, // Check ONLY on the new booking's specific date
+      appointmentDate: bookingDateUTC,
       status: { $in: ['pending', 'confirmed'] },
-
-      'appointmentTime.start': appointmentTime.start,
-      'appointmentTime.end': appointmentTime.end,
+      'appointmentTime.start': appointmentTime.start, 
     });
-    if (clientOverlapping.length > 0) {
-      return res.status(400).json({ error: 'You already have an overlapping appointment at this date and time.' });
+    if (clientOverlapping) {
+      console.log('Client already has an appointment at this specific date and start time:', clientOverlapping);
+      return res.status(400).json({ error: 'You already have an appointment at this specific date and start time.' });
     }
 
-    const totalPointsRequired = pendingAppointments.length * 250;
-    if (client.membership.points < totalPointsRequired) {
-      return res.status(400).json({ error: 'Insufficient points for all pending appointments' });
-    }
-
-    // Check for overlapping appointments
-    const existingAppointment = await Appointment.findOne({
+    const trainerExistingConfirmedAppointment = await Appointment.findOne({
       trainerId: trainer._id,
-      appointmentDate,
-      // $or: [
-      //   { 'appointmentTime.start': { $lt: appointmentTime.end, $gte: appointmentTime.start } },
-      //   { 'appointmentTime.end': { $gt: appointmentTime.start, $lte: appointmentTime.end } },
-      // ],
-      clientId: client._id,
+      appointmentDate: bookingDateUTC,
       'appointmentTime.start': appointmentTime.start,
-      'appointmentTime.end': appointmentTime.end,
-      status: { $in: ['pending', 'confirmed'] },
-    });
-
-    if (existingAppointment) {
-      return res.status(400).json({ error: 'The selected time slot is already booked' });
-    }
-
-    // Check if the trainer already has a confirmed appointment with any client at this time
-    const trainerExistingAppointment = await Appointment.findOne({
-      trainerId: trainer._id,
-      appointmentDate,
-      'appointmentTime.start': appointmentTime.start,
-      'appointmentTime.end': appointmentTime.end,
-      //isConfirmed: true,
       status: 'confirmed',
     });
 
-    if (trainerExistingAppointment) {
-      return res.status(400).json({ error: 'Trainer already has a confirmed appointment at this time' });
+    if (trainerExistingConfirmedAppointment) {
+      return res.status(400).json({ error: 'Trainer already has a confirmed appointment at this specific date and start time.' });
     }
 
     // Create and save appointment
     const newAppointment = new Appointment({
       clientId: client._id,
       trainerId: trainer._id,
-      appointmentDate,
+      appointmentDate: bookingDateUTC, 
       appointmentTime,
       serviceType,
     });
@@ -130,29 +118,32 @@ const createAppointment = async (req, res) => {
           model: 'MembershipPackage'
         }
       })
-      // .populate({
-      //   path: 'clientId',
-      //   populate: {
-      //     path: 'membership.purchaseHistory.packageType',
-      //     model: 'MembershipPackage'
-      //   }
-      // })
-      .populate('trainerId');
+      .populate('trainerId'); 
 
     const io = req.app.get('io');
-    io.emit('new_appointment', populatedAppointment);
-    console.log('New appointment event emitted');
-    // Send notification to the trainer
-    const user = await User.findOne({ uid: trainerUid });
-    if (!user) {
-      return res.status(404).json({ error: 'Trainer not found' });
+    if (io) {
+        io.emit('new_appointment', populatedAppointment);
+        console.log('New appointment event emitted');
     }
-    await notification.sendNewBookingNotificationToTrainer(user.fcmToken, populatedAppointment, trainerUid);
-    console.log('Notification sent to trainer', user.fcmToken);
-    res.status(201).json({ message: 'Appointment created successfully', savedAppointment });
+
+    const trainerUserDoc = await User.findOne({ uid: trainerUid }); 
+    if (!trainerUserDoc) {
+      console.error('Trainer user document not found for sending notification, trainerUid:', trainerUid);
+    } else if (trainerUserDoc.fcmToken) {
+      try {
+        await notification.sendNewBookingNotificationToTrainer(trainerUserDoc.fcmToken, populatedAppointment, trainerUid);
+        console.log('Notification sent to trainer', trainerUserDoc.fcmToken);
+      } catch (notificationError) {
+        console.error('Failed to send notification to trainer:', notificationError);
+      }
+    } else {
+        console.log('Trainer user document found, but no FCM token available for UID:', trainerUid);
+    }
+    
+    res.status(201).json({ message: 'Appointment created successfully', appointment: populatedAppointment }); // Send populated appointment
   } catch (error) {
-    console.error('Error creating appointment:', error.message);
-    res.status(500).json({ error: 'Error creating appointment' });
+    console.error('Error creating appointment:', error.message, error.stack);
+    res.status(500).json({ error: 'Server error while creating appointment' });
   }
 };
 

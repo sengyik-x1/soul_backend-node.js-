@@ -5,7 +5,7 @@ async function sendNewBookingNotificationToTrainer(trainerFcmToken, bookingDetai
   const message = {
     notification: {
       title: 'New Booking Request',
-      body: `Client ${bookingDetails.clientId?.name || 'A client'} has requested a booking for ${bookingDetails.serviceType}.`, // Access client's name if available
+      body: `Client ${bookingDetails.clientId?.name || bookingDetails.clientId?.email} has requested a booking for ${bookingDetails.serviceType}.`, // Access client's name if available
     },
     data: {
       type: 'new_booking_request',
