@@ -55,6 +55,30 @@ const registerFCMToken = async (req, res) => {
   }
 }
 
+const clearFCMToken = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Clear the token for the user
+    const user = await User.findOneAndUpdate({ uid: userId }, { fcmToken: null }, { new: true });
+    if (!user) {
+      console.error('Cant find user with uid:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    console.log(`Cleared device token for user ${userId}`);
+    
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error clearing device token:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 // Get all users
 const getAllUsers = async (req, res) => {
   try {
@@ -83,4 +107,4 @@ const getUserRole = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, registerFCMToken, getAllUsers, getUserRole };
+module.exports = { registerUser, registerFCMToken, clearFCMToken ,getAllUsers, getUserRole };
