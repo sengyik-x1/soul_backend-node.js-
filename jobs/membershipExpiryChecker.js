@@ -6,7 +6,7 @@ const Client = require('../model/Client'); // Adjust path as necessary
 // For example, '0 1 * * *' would run at 1 AM every day.
 // '*/5 * * * *' would run every 5 minutes (for testing)
 const scheduleMembershipCheck = () => {
-    cron.schedule('*/5 * * * *', async () => {
+    cron.schedule('0 0 * * *', async () => {
         console.log('Running scheduled job: Checking for expired client memberships - ', new Date().toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"}));
         
         try {
