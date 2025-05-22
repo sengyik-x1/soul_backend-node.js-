@@ -206,7 +206,8 @@ const getClientMonthlyTrainingVolume = async (req, res) => {
             { 
               $match: { 
                 client: client._id,
-                reportStatus: 'completed'
+                reportStatus: //include completed and reviewed reports
+                  { $in: ['completed', 'reviewed'] }
               } 
             },
             {
